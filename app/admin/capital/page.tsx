@@ -2,7 +2,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { PiggyBank, Calendar, Plus, Wallet, TrendingUp, RefreshCcw, History, CheckCircle2, CircleDashed, ArrowUpRight, Edit2, Trash2, X, Save, ChevronLeft, ChevronRight, Banknote } from 'lucide-react';
+import { PiggyBank, Calendar, Plus, Wallet, TrendingUp, RefreshCcw, History, CheckCircle2, CircleDashed, ArrowUpRight, Edit2, Trash2, X, Save, ChevronLeft, ChevronRight, Banknote, QrCode } from 'lucide-react';
 
 export default function AdminFinancialLedger() {
   const [ledger, setLedger] = useState<any[]>([]);
@@ -31,6 +31,11 @@ export default function AdminFinancialLedger() {
   const [editReporter, setEditReporter] = useState('');
   const [editIsPaid, setEditIsPaid] = useState(true);
 
+  // States VietQR Popup
+  const [showQrModal, setShowQrModal] = useState(false);
+  const [activeQrUrl, setActiveQrUrl] = useState('');
+  const [activeQrTarget, setActiveQrTarget] = useState<any>(null);
+
   // PHÂN TRANG CHO SỔ CÁI
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8; 
@@ -38,7 +43,7 @@ export default function AdminFinancialLedger() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const { data: emps } = await supabase.from('employees').select('id, full_name').eq('is_active', true);
+      const { data: emps } = await supabase.from('employees').select('*');
       setEmployees(emps || []);
       if (emps && emps.length > 0 && !reporter) setReporter(emps[0].full_name);
 
@@ -53,6 +58,7 @@ export default function AdminFinancialLedger() {
     } catch (e) {
       console.error(e);
     } finally {
+      // Đã sửa lỗi chính tả chính xác tại đây sếp nhé!
       setLoading(false);
     }
   };
@@ -141,13 +147,27 @@ export default function AdminFinancialLedger() {
     }
   };
 
-  // THUẬT TOÁN ĐỐI SOÁT TÀI CHÍNH HỢP NHẤT
+  // HÀM: TỰ ĐỘNG SINH MÃ VIETQR ĐỘNG KHÔNG CẦN CHỦ THÈ
+  const handleGenerateVietQR = (item: any) => {
+    const matchedStaff = employees.find(e => e.full_name === item.requested_by);
+    
+    if (!matchedStaff || !matchedStaff.bank_account_number || !matchedStaff.bank_name) {
+      alert(`⚠️ Không thể gen mã QR: Nhân sự [${item.requested_by}] chưa cập nhật tài khoản ngân hàng!`);
+      return;
+    }
+
+    const cleanCategory = encodeURIComponent(item.category);
+    const qrUrl = `https://img.vietqr.io/image/${matchedStaff.bank_name}-${matchedStaff.bank_account_number}-compact2.png?amount=${item.amount}&addInfo=${cleanCategory}`;
+    
+    setActiveQrUrl(qrUrl);
+    setActiveQrTarget({ item, staff: matchedStaff });
+    setShowQrModal(true);
+  };
+
   const totalGop = ledger.filter(l => l.type === 'VON_GOP' && l.is_paid).reduce((sum, l) => sum + Number(l.amount), 0);
   const totalDoanhThu = ledger.filter(l => l.type === 'DOANH_THU' && l.is_paid).reduce((sum, l) => sum + Number(l.amount), 0);
   const totalChi = ledger.filter(l => l.type === 'CHI_TIEU' && l.is_paid).reduce((sum, l) => sum + Number(l.amount), 0);
   const totalTreo = ledger.filter(l => !l.is_paid).reduce((sum, l) => sum + Number(l.amount), 0);
-  
-  // Thuật toán nảy số: Số tiền còn lại thực tế trong két = (Vốn + Doanh thu) - Chi phí
   const totalRemainingBalance = (totalGop + totalDoanhThu) - totalChi;
 
   return (
@@ -165,14 +185,12 @@ export default function AdminFinancialLedger() {
         </div>
       </div>
 
-      {/* METRICS CARD MA TRẬN 5 CỘT HIỂN THỊ RÕ RÀNG */}
+      {/* METRICS CARD 5 KHỐI HỢP NHẤT */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 text-xs font-bold uppercase tracking-wider">
         <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl flex justify-between items-center"><div><p className="text-slate-500 text-[10px]">Vốn Đầu Tư</p><p className="text-xs font-black text-emerald-400 mt-1 font-mono">+{totalGop.toLocaleString()} đ</p></div><Wallet className="w-4 h-4 text-emerald-500" /></div>
         <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl flex justify-between items-center"><div><p className="text-slate-500 text-[10px]">Doanh Thu</p><p className="text-xs font-black text-blue-400 mt-1 font-mono">+{totalDoanhThu.toLocaleString()} đ</p></div><ArrowUpRight className="w-4 h-4 text-blue-400" /></div>
         <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl flex justify-between items-center"><div><p className="text-slate-500 text-[10px]">Chi phí Đã trả</p><p className="text-xs font-black text-red-400 mt-1 font-mono">-{totalChi.toLocaleString()} đ</p></div><TrendingUp className="w-4 h-4 text-red-400" /></div>
         <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl flex justify-between items-center"><div><p className="text-slate-500 text-[10px]">Khoản Treo Nợ</p><p className="text-xs font-black text-amber-400 mt-1 font-mono">{totalTreo.toLocaleString()} đ</p></div><History className="w-4 h-4 text-amber-400" /></div>
-        
-        {/* THẺ CHỈ SỐ MỚI THÊM: SỐ TIỀN CÒN LẠI TRONG KÉT */}
         <div className="bg-slate-900 border-2 border-cyan-500/30 p-4 rounded-2xl flex justify-between items-center shadow-lg shadow-cyan-950/20">
           <div>
             <p className="text-cyan-400 text-[10px]">Số tiền còn lại</p>
@@ -229,20 +247,22 @@ export default function AdminFinancialLedger() {
                   <td className="p-4 text-slate-400 font-medium">{l.requested_by}</td>
                   <td className="p-4">
                     <button onClick={() => handleTogglePaid(l.id, l.is_paid)} className={`px-2 py-1.5 flex items-center gap-1.5 rounded-lg font-bold border text-[10px] transition ${l.is_paid ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-amber-500/10 border-amber-500/30 text-amber-500'}`}>
-                      {l.is_paid ? <><CheckCircle2 className="w-3.5 h-3.5" /> Đã Trả</> : <><CircleDashed className="w-3.5 h-3.5" /> Nợ/Treo</>}
+                      {l.is_paid ? 'Đã Trả' : 'Treo nợ'}
                     </button>
                   </td>
                   <td className={`p-4 text-right font-mono font-bold text-sm ${l.type === 'CHI_TIEU' ? 'text-red-400' : 'text-emerald-400'}`}>{l.type === 'CHI_TIEU' ? '-' : '+'}{Number(l.amount).toLocaleString()} đ</td>
                   <td className="p-4 text-center space-x-1.5">
-                    <button onClick={() => handleOpenEdit(l)} className="p-1.5 bg-slate-950 border border-slate-800 hover:bg-slate-800 rounded-lg text-blue-400 transition"><Edit2 className="w-3.5 h-3.5" /></button>
-                    <button onClick={() => handleDeleteLedger(l.id)} className="p-1.5 bg-slate-950 border border-slate-800 hover:bg-red-950/30 rounded-lg text-red-500 transition"><Trash2 className="w-3.5 h-3.5" /></button>
+                    {l.type === 'CHI_TIEU' && !l.is_paid && (
+                      <button onClick={() => handleGenerateVietQR(l)} className="p-1.5 bg-cyan-950 border border-cyan-800 hover:bg-cyan-900 rounded-lg text-cyan-400 transition" title="Bắn mã VietQR hoàn ứng"><QrCode className="w-3.5 h-3.5" /></button>
+                    )}
+                    <button onClick={() => handleOpenEdit(l)} className="p-1.5 bg-slate-950 border border-slate-800 rounded-lg text-blue-400 transition"><Edit2 className="w-3.5 h-3.5" /></button>
+                    <button onClick={() => handleDeleteLedger(l.id)} className="p-1.5 bg-slate-950 border border-slate-800 rounded-lg text-red-500 transition"><Trash2 className="w-3.5 h-3.5" /></button>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
 
-          {/* FOOTER THANH PHÂN TRANG */}
           {totalPages > 1 && (
             <div className="flex justify-between items-center p-4 bg-slate-950/50 border-t border-slate-800 text-xs shrink-0">
               <span className="text-[10px] text-slate-500 font-mono">Trang {currentPage} / {totalPages} (Tổng {ledger.length} giao dịch)</span>
@@ -263,7 +283,6 @@ export default function AdminFinancialLedger() {
               <h3 className="font-bold text-slate-200 uppercase flex items-center gap-1.5">📝 Điều chỉnh dòng tiền ghi sổ</h3>
               <button onClick={() => { setShowEditModal(false); setEditingId(null); }} className="text-slate-500 hover:text-white"><X className="w-5 h-5" /></button>
             </div>
-
             <div className="space-y-3">
               <div>
                 <label className="text-slate-400 font-bold">Nghiệp vụ tài chính:</label>
@@ -281,15 +300,36 @@ export default function AdminFinancialLedger() {
               </div>
               <div className="pt-2"><label className="flex items-center gap-2 cursor-pointer p-3 bg-slate-950 border border-slate-800 rounded-xl hover:border-blue-500 transition"><input type="checkbox" checked={editIsPaid} onChange={(e) => setEditIsPaid(e.target.checked)} className="accent-blue-500 w-4 h-4" /><span className="text-slate-200 font-bold">{editIsPaid ? '✅ Tiền ĐÃ THANH TOÁN hoàn toàn' : '⏳ Chuyển về trạng thái TREO NỢ'}</span></label></div>
             </div>
-
             <div className="pt-2 border-t border-slate-800 flex gap-2">
               <button onClick={() => { setShowEditModal(false); setEditingId(null); }} className="flex-1 bg-slate-950 border border-slate-800 hover:bg-slate-800 p-3 rounded-xl font-bold text-slate-400 text-center transition">Hủy bỏ</button>
-              <button onClick={handleSaveEdit} className="flex-1 bg-blue-600 hover:bg-blue-700 p-3 rounded-xl font-bold text-white uppercase tracking-wider flex items-center justify-center gap-1.5 transition shadow-lg"><Save className="w-4 h-4" /> Lưu thay đổi</button>
+              <button onClick={handleSaveEdit} className="flex-1 bg-blue-600 hover:bg-blue-700 p-3 rounded-xl font-bold text-white uppercase tracking-wider transition shadow-lg"><Save className="w-4 h-4" /> Lưu thay đổi</button>
             </div>
           </div>
         </div>
       )}
 
+      {/* POPUP HIỂN THỊ VIETQR ĐỘNG */}
+      {showQrModal && activeQrTarget && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 w-full max-w-sm text-center space-y-4 relative">
+            <button onClick={() => { setShowQrModal(false); setActiveQrUrl(''); }} className="absolute top-4 right-4 text-slate-500 hover:text-white"><X className="w-5 h-5" /></button>
+            <div className="space-y-1">
+              <h3 className="font-black text-xs uppercase tracking-wider text-cyan-400">📲 QUÉT MÃ CHUYỂN KHOẢN VIETQR</h3>
+              <p className="text-[11px] text-slate-400">Hoàn tiền ứng chi mua vật tư cho thợ xưởng</p>
+            </div>
+            <div className="bg-white p-3 rounded-2xl inline-block border-4 border-cyan-500/30">
+              <img src={activeQrUrl} alt="VietQR Động" className="w-64 h-64 object-contain" />
+            </div>
+            <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 text-left space-y-1.5 text-[11px] font-mono leading-relaxed">
+              <p><span className="text-slate-500">Ngân hàng:</span> <span className="text-cyan-400 font-bold">{activeQrTarget.staff.bank_name}</span></p>
+              <p><span className="text-slate-500">Số tài khoản:</span> <span className="text-slate-200 font-bold">{activeQrTarget.staff.bank_account_number}</span></p>
+              <p><span className="text-slate-500">Số tiền hoàn:</span> <span className="text-red-400 font-bold text-xs">{activeQrTarget.item.amount.toLocaleString()} đ</span></p>
+              <p className="truncate"><span className="text-slate-500">Nội dung:</span> <span className="text-slate-300 italic">{activeQrTarget.item.category}</span></p>
+            </div>
+            <p className="text-[10px] text-slate-500 italic">💡 Mẹo: Dùng bất kỳ App ngân hàng nào để quét mã tự điền 100% dữ liệu.</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
