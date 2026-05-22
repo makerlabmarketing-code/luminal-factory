@@ -2,9 +2,11 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import { useNotification } from '@/component/NotificationContext';
 import { Database, Plus, Trash2, Save, RefreshCcw, Layers, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 
 export default function MetadataManagement() {
+  const { showToast, showConfirm } = useNotification();
   const [categories, setCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
@@ -63,19 +65,22 @@ export default function MetadataManagement() {
     : [];
 
   const handleCreateCategory = async () => {
-    if (!newCatName.trim()) return;
+    if (!newCatName.trim()) return showToast('Thiếu thông tin', 'Sếp vui lòng nhập tên danh mục lớn!', 'error');
     const { data } = await supabase.from('system_metadata').insert([{ name: newCatName.trim(), data: [] }]).select();
     if (data && data.length > 0) setSelectedCatId(data[0].id.toString());
     setNewCatName(''); loadMetadata();
-    alert('✨ Khởi tạo danh mục lớn thành công!');
+    // 🔥 ĐÃ VÁ: Chuyển sang Popup Toast dùng chung
+    showToast('Thành công', '✨ Khởi tạo danh mục lớn hệ thống thành công!', 'success');
   };
 
-  const handleDeleteCategory = async () => {
+  const handleDeleteCategory = () => {
     if (!activeCategory) return;
-    if (window.confirm(`⚠️ Xóa vĩnh viễn danh mục lớn [${activeCategory.name}]?`)) {
+    // 🔥 ĐÃ VÁ: Thay confirm() trình duyệt bằng hộp thoại Confirm Modal bo góc
+    showConfirm('Xóa danh mục lớn', `Sếp có chắc chắn muốn xóa vĩnh viễn danh mục lớn [${activeCategory.name}] cùng toàn bộ thuộc tính con không?`, async () => {
       await supabase.from('system_metadata').delete().eq('id', activeCategory.id);
       setSelectedCatId(''); loadMetadata();
-    }
+      showToast('Đã xóa vĩnh viễn', 'Danh mục lớn đã được gỡ bỏ.', 'info');
+    });
   };
 
   const handleAddRow = () => {
@@ -116,20 +121,12 @@ export default function MetadataManagement() {
   const handleSaveCategory = async () => {
     if (!activeCategory) return;
     await supabase.from('system_metadata').update({ data: activeCategory.data }).eq('id', activeCategory.id);
-    alert(`✨ Đã đồng bộ danh mục [${activeCategory.name}] lên Cloud!`);
+    // 🔥 ĐÃ VÁ: Chuyển sang Popup Toast
+    showToast('Đồng bộ thành công', `✨ Đã cập nhật và lưu trữ danh mục [${activeCategory.name}] lên Cloud!`, 'success');
   };
 
-  if (loading) {
-    return (
-      <div className="p-6 text-xs text-center font-mono text-slate-500 min-h-screen bg-slate-950 flex items-center justify-center gap-2">
-        <RefreshCcw className="w-4 h-4 animate-spin inline" />
-        <span>Đang kết nối danh mục dữ liệu...</span>
-      </div>
-    );
-  }
-
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6 text-slate-100 bg-slate-950 min-h-screen font-sans">
+    <div className="p-6 max-w-7xl mx-auto space-y-6 text-slate-100 bg-slate-950 min-h-screen font-sans">
       
       {/* HEADER TỔNG */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-slate-800 pb-4 gap-4">
@@ -137,7 +134,7 @@ export default function MetadataManagement() {
           <Layers className="w-5 h-5 text-purple-400" />
           <div>
             <h1 className="text-base font-bold">Hệ Thống Danh Mục Metadata Trung Tâm</h1>
-            <p className="text-[11px] text-slate-400 mt-0.5">Bảng cấu trúc thuộc tính động không phụ thuộc mã cứng hệ thống</p>
+            <p className="text-[11px] text-slate-400 mt-0.5">Bảng cấu trúc thuộc tính động điều khiển dây chuyền xưởng máy</p>
           </div>
         </div>
         <div className="flex gap-2 w-full sm:w-auto bg-slate-900 border border-slate-800 p-1.5 rounded-xl text-xs">
@@ -151,9 +148,12 @@ export default function MetadataManagement() {
         <div className="px-5 py-3 border-b border-slate-800 bg-slate-950/40 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div className="flex items-center gap-2.5 w-full md:w-auto">
             <Database className="w-4 h-4 text-purple-400 shrink-0" />
-            <select className="bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-purple-300 font-black focus:outline-none w-full md:w-64" value={selectedCatId} onChange={(e) => handleCategoryFilterChange(e.target.value)}>
+            <select className="bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-purple-300 font-black focus:outline-none w-full md:w-64 cursor-pointer" value={selectedCatId} onChange={(e) => handleCategoryFilterChange(e.target.value)}>
               {categories.map(c => <option key={c.id} value={c.id}>📁 {c.name} ({c.data?.length || 0})</option>)}
             </select>
+            {activeCategory && (
+              <button onClick={handleDeleteCategory} className="p-2 bg-slate-950 border border-red-900/30 text-red-400 hover:bg-red-950/20 rounded-xl text-[10px] font-bold transition">Xóa danh mục lớn</button>
+            )}
           </div>
 
           <div className="flex items-center gap-3 w-full md:w-auto justify-end">
@@ -175,12 +175,12 @@ export default function MetadataManagement() {
             </thead>
             <tbody className="divide-y divide-slate-800/50">
               {paginatedRows.length === 0 ? (
-                <tr><td colSpan={tableHeaders.length + 1} className="p-8 text-center text-slate-500 font-mono">Chưa có hàng dữ liệu nào khớp bộ lọc.</td></tr>
+                <tr><td colSpan={tableHeaders.length + 1} className="p-8 text-center text-slate-500 font-mono italic">Chưa có hàng dữ liệu con nào khớp bộ lọc tra cứu.</td></tr>
               ) : paginatedRows.map((row) => (
                 <tr key={row.__globalIndex} className="hover:bg-slate-950/30 transition">
                   {tableHeaders.map((key) => (
                     <td key={key} className="p-3">
-                      <input type={key === 'rate' ? 'number' : 'text'} className="w-full bg-slate-950/70 border border-slate-800 rounded-xl p-2.5 text-xs text-slate-100 focus:outline-none" value={row[key] !== undefined ? row[key] : ''} onChange={(e) => handleUpdateRowValue(row.__globalIndex, key, e.target.value)} />
+                      <input type={key === 'rate' ? 'number' : 'text'} className="w-full bg-slate-950/70 border border-slate-800 rounded-xl p-2.5 text-xs text-slate-100 focus:outline-none font-medium" value={row[key] !== undefined ? row[key] : ''} onChange={(e) => handleUpdateRowValue(row.__globalIndex, key, e.target.value)} />
                     </td>
                   ))}
                   <td className="p-3 text-center">
@@ -192,7 +192,7 @@ export default function MetadataManagement() {
           </table>
         </div>
 
-        {/* THANH PHÂN TRANG ENTERPRISE PHẲNG CHUẨN 100% THEO TRANG MẪU IMAGE_CBEB6A.PNG */}
+        {/* THANH PHÂN TRANG */}
         <div className="p-4 bg-slate-950/50 border-t border-slate-800 flex flex-col md:flex-row justify-between items-center gap-4 text-xs font-mono text-slate-400 select-none">
           <div className="w-full md:w-auto flex justify-between md:justify-start items-center gap-4">
             <button onClick={handleAddRow} className="text-purple-400 hover:text-purple-300 font-bold flex items-center gap-1 transition font-sans"><Plus className="w-4 h-4" /> Thêm hàng con mới</button>
@@ -202,7 +202,7 @@ export default function MetadataManagement() {
           <div className="flex flex-wrap items-center justify-end gap-4 w-full md:w-auto">
             <div className="flex items-center gap-1.5">
               <span>Show rows:</span>
-              <select className="bg-slate-900 border border-slate-800 rounded-lg px-2 py-1 font-bold text-slate-200 focus:outline-none" value={itemsPerPage} onChange={(e) => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); setPageInput('1'); }}>
+              <select className="bg-slate-900 border border-slate-800 rounded-lg px-2 py-1 font-bold text-slate-200 focus:outline-none cursor-pointer" value={itemsPerPage} onChange={(e) => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); setPageInput('1'); }}>
                 <option value={5}>5</option><option value={10}>10</option><option value={20}>20</option><option value={50}>50</option>
               </select>
             </div>
@@ -218,7 +218,7 @@ export default function MetadataManagement() {
             </div>
 
             <div className="flex items-center gap-1.5">
-              <input type="number" min={1} max={totalPages} className="w-12 bg-slate-900 border border-slate-800 rounded-lg p-1 text-center font-bold text-slate-100" value={pageInput} onChange={(e) => setPageInput(e.target.value)} />
+              <input type="number" min={1} max={totalPages} className="w-12 bg-slate-900 border border-slate-800 rounded-lg p-1 text-center font-bold text-slate-100 focus:outline-none" value={pageInput} onChange={(e) => setPageInput(e.target.value)} />
               <button onClick={() => { const p = Number(pageInput); if (p >= 1 && p <= totalPages) setCurrentPage(p); }} className="bg-slate-900 border border-slate-800 px-3 py-1 rounded-lg font-black hover:bg-slate-800 text-slate-200 transition">Go</button>
             </div>
           </div>

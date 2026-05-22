@@ -2,9 +2,11 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Sliders, Plus, Trash2, Save, RefreshCcw, Eye, EyeOff, X, Filter, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { useNotification } from '@/component/NotificationContext';
+import { Sliders, Plus, Trash2, Save, RefreshCcw, Eye, EyeOff, X, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 
 export default function AdminSystemSettings() {
+  const { showToast, showConfirm } = useNotification();
   const [settings, setSettings] = useState<any[]>([]);
   const [configGroups, setConfigGroups] = useState<any[]>([]); 
   const [loading, setLoading] = useState(true);
@@ -14,7 +16,7 @@ export default function AdminSystemSettings() {
   const [selectedGroupFilter, setSelectedGroupFilter] = useState<string>('ALL');
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10); // Cho phép cấu hình số bản ghi hiển thị
+  const [itemsPerPage, setItemsPerPage] = useState(10); 
   const [pageInput, setPageInput] = useState('1');
 
   // Form States Popup Modals
@@ -42,7 +44,7 @@ export default function AdminSystemSettings() {
         setSettings(configs || []);
       }
     } catch (err: any) {
-      setDbError(err?.message || 'Lỗi kết nối mạng đám mây');
+      setDbError(err?.message || 'Lỗi kết nối mạng đám mây Cloud');
     } finally {
       setLoading(false);
     }
@@ -68,16 +70,30 @@ export default function AdminSystemSettings() {
     setShowModal(true);
   };
 
-  const handleDeleteConfig = async (keyToDelete: string, name: string) => {
-    if (window.confirm(`⚠️ Sếp có chắc chắn muốn xóa vĩnh viễn cấu hình [${name}] không?`)) {
-      const { error } = await supabase.from('system_settings').delete().eq('key', keyToDelete);
-      if (error) alert('❌ Lỗi xóa: ' + error.message);
-      loadSettingsData();
-    }
+  const handleDeleteConfig = (keyToDelete: string, name: string) => {
+    // 🔥 ĐÃ VÁ LỖI: Chuyển đổi confirm hệ thống sang Custom Confirm Dialog bo góc cao cấp
+    showConfirm(
+      'Xác nhận hủy biến số', 
+      `Sếp có chắc chắn muốn xóa vĩnh viễn cấu hình hệ thống [${name}] không? Hành động này có thể ảnh hưởng luồng sinh mã VietQR.`, 
+      async () => {
+        try {
+          const { error } = await supabase.from('system_settings').delete().eq('key', keyToDelete);
+          if (error) {
+            showToast('Lỗi kết nối', `Không thể gỡ bỏ: ${error.message}`, 'error');
+          } else {
+            await loadSettingsData();
+            showToast('Đã xóa', 'Tham số cấu hình cốt lõi đã được giải phóng khỏi hệ thống.', 'success');
+          }
+        } catch (e: any) { showToast('Lỗi hệ thống', e.message, 'error'); }
+      }
+    );
   };
 
   const handleSaveConfig = async () => {
-    if (!configName.trim()) { alert('Vui lòng điền Tên hiển thị cấu hình!'); return; }
+    if (!configName.trim()) { 
+      showToast('Thiếu thông tin', 'Sếp vui lòng điền đầy đủ Tên hiển thị cấu hình!', 'error'); 
+      return; 
+    }
     
     let finalKey = key;
     if (!isEditing) {
@@ -100,17 +116,22 @@ export default function AdminSystemSettings() {
       description: description.trim() 
     };
 
-    if (isEditing) {
-      const { error } = await supabase.from('system_settings').update(payload).eq('key', finalKey);
-      if (error) return alert('❌ Lỗi cập nhật: ' + error.message);
-    } else {
-      const { error } = await supabase.from('system_settings').insert([payload]);
-      if (error) return alert('❌ Lỗi thêm mới: ' + error.message);
-    }
+    try {
+      if (isEditing) {
+        const { error } = await supabase.from('system_settings').update(payload).eq('key', finalKey);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('system_settings').insert([payload]);
+        if (error) throw error;
+      }
 
-    setShowModal(false); 
-    loadSettingsData();
-    alert('✨ Lưu thành công!');
+      setShowModal(false); 
+      await loadSettingsData();
+      // 🔥 ĐÃ VÁ: Nổ Toast UI sang xịn mịn
+      showToast('Thành công', '✨ Biến cấu hình hệ thống mới đã được đồng bộ hóa thành công!', 'success');
+    } catch (catchErr: any) {
+      showToast('Lỗi Database', catchErr.message, 'error');
+    }
   };
 
   const handleInlineValueChange = (targetKey: string, newValue: string) => {
@@ -123,9 +144,10 @@ export default function AdminSystemSettings() {
       for (const item of settings) {
         await supabase.from('system_settings').update({ value: item.value }).eq('key', item.key);
       }
-      alert('✨ Đã lưu áp dụng toàn bộ thay đổi giá trị hệ thống!');
-    } catch (e) {
-      console.error(e);
+      // 🔥 ĐÃ VÁ: Toast thông báo đồng loạt
+      showToast('Đã áp dụng', '✨ Đã đồng bộ và cập nhật toàn bộ giá trị chỉnh sửa dòng trực tiếp xuống Database!', 'success');
+    } catch (e: any) {
+      showToast('Thất bại', e.message, 'error');
     } finally {
       loadSettingsData();
     }
@@ -136,7 +158,6 @@ export default function AdminSystemSettings() {
     return matched ? matched.label : `📁 Phân hệ (${code})`;
   };
 
-  // Logic đa lọc dữ liệu
   const filteredSettings = settings.filter(s => {
     const matchGroup = selectedGroupFilter === 'ALL' || (s.group_name || '').toUpperCase().trim() === selectedGroupFilter.toUpperCase().trim();
     const matchText = !searchTerm.trim() || 
@@ -146,50 +167,40 @@ export default function AdminSystemSettings() {
     return matchGroup && matchText;
   });
 
-  // Tính toán toán học phân trang
   const totalPages = Math.ceil(filteredSettings.length / itemsPerPage) || 1;
   const paginatedSettings = filteredSettings.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
-  if (loading) {
-    return (
-      <div className="p-6 text-xs text-center font-mono text-slate-500 min-h-screen bg-slate-950 flex items-center justify-center gap-2">
-        <RefreshCcw className="w-4 h-4 animate-spin inline" />
-        <span>Đang tải cấu hình hệ thống...</span>
-      </div>
-    );
-  }
-
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6 text-slate-100 bg-slate-950 min-h-screen font-sans">
+    <div className="p-6 max-w-7xl mx-auto space-y-6 text-slate-100 bg-slate-950 min-h-screen font-sans">
       
-      {/* HEADER */}
+      {/* HEADER TỔNG */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-slate-800 pb-4 gap-4">
         <div className="flex items-center gap-2">
           <Sliders className="w-5 h-5 text-blue-500" />
           <div>
             <h1 className="text-base font-bold">Cấu Hình Biến Hệ Thống Cốt Lõi</h1>
+            <p className="text-[11px] text-slate-400 mt-0.5">Quản lý các tham số, token bảo mật, tài khoản ngân hàng VietQR trung tâm</p>
           </div>
         </div>
-        <button onClick={handleOpenAdd} className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl flex items-center gap-1.5 transition">
+        <button onClick={handleOpenAdd} className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl flex items-center gap-1.5 transition shadow-lg">
           <Plus className="w-4 h-4" /> Tạo Biến Mới
         </button>
       </div>
 
-      {dbError && <div className="p-4 bg-red-950/40 border border-red-500/30 rounded-xl text-xs text-red-400 font-mono">⚠️ LỖI: {dbError}</div>}
+      {dbError && <div className="p-4 bg-red-950/40 border border-red-500/30 rounded-xl text-xs text-red-400 font-mono">⚠️ LỖI KẾT NỐI: {dbError}</div>}
 
-      {/* RENDER GRID BẢNG QUẢN TRỊ */}
+      {/* CONTAINER DATA GRID */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
         
-        {/* THANH ĐIỀU KHIỂN GÓC BẢNG */}
         <div className="px-5 py-3 border-b border-slate-800 bg-slate-950/40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
           <div className="flex items-center gap-2 w-full sm:w-auto">
-            <span className="text-[11px] text-slate-400 font-bold uppercase tracking-wider whitespace-nowrap">Phân hệ:</span>
+            <span className="text-[11px] text-slate-400 font-bold uppercase tracking-wider whitespace-nowrap">Phân hệ lọc:</span>
             <select 
-              className="bg-slate-950 border border-slate-800 rounded-xl p-2 text-xs text-purple-300 font-black focus:outline-none w-full sm:w-52"
+              className="bg-slate-950 border border-slate-800 rounded-xl p-2 text-xs text-purple-300 font-black focus:outline-none w-full sm:w-52 cursor-pointer"
               value={selectedGroupFilter}
               onChange={(e) => { setSelectedGroupFilter(e.target.value); setCurrentPage(1); }}
             >
-              <option value="ALL">🌐 Hiển thị tất cả ({settings.length})</option>
+              <option value="ALL">🌐 Hiển thị tất cả tham số ({settings.length})</option>
               {configGroups.map(g => <option key={g.code} value={g.code}>{g.label}</option>)}
             </select>
           </div>
@@ -199,7 +210,7 @@ export default function AdminSystemSettings() {
             <input 
               type="text" 
               placeholder="Tìm kiếm nhanh tên tham số..." 
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-blue-500/50"
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-200 focus:outline-none"
               value={searchTerm}
               onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
             />
@@ -211,27 +222,27 @@ export default function AdminSystemSettings() {
             <thead className="bg-slate-950 text-slate-400 border-b border-slate-800 uppercase text-[10px] tracking-wider font-semibold">
               <tr>
                 <th className="p-4 w-1/4">Thuộc Phân Nhóm</th>
-                <th className="p-4 w-1/4">Tên Hiển Thị Cấu Hinh</th>
+                <th className="p-4 w-1/4">Tên Hiển Thị Cấu Hình</th>
                 <th className="p-4 w-1/4">Giá Trị Cấu Hình (Value)</th>
                 <th className="p-4 w-1/4">Mô Tả Hướng Dẫn</th>
                 <th className="p-4 text-center w-24">Thao Tác</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/60">
+            <tbody className="divide-y divide-slate-800/60 text-[11px] font-medium">
               {paginatedSettings.length === 0 ? (
-                <tr><td colSpan={5} className="p-8 text-center text-slate-500 font-mono">Không tìm thấy bản ghi cấu hình nào khớp.</td></tr>
+                <tr><td colSpan={5} className="p-8 text-center text-slate-500 font-mono italic">Không tìm thấy bản ghi cấu hình hệ thống nào tương ứng mốc lọc.</td></tr>
               ) : (
                 paginatedSettings.map((cfg) => {
                   const isSecret = (cfg.key || '').toLowerCase().includes('pass') || (cfg.key || '').toLowerCase().includes('token');
                   return (
-                    <tr key={cfg.key} className="hover:bg-slate-950/20 transition text-[11px]">
+                    <tr key={cfg.key} className="hover:bg-slate-950/20 transition">
                       <td className="p-4"><span className="bg-slate-950 border border-slate-800 px-2.5 py-1.5 rounded-lg text-purple-400 font-bold block w-fit text-[10px]">{getGroupLabel(cfg.group_name)}</span></td>
-                      <td className="p-4"><p className="font-bold text-slate-200 text-xs">{cfg.config_name}</p></td>
+                      <td className="p-4"><p className="font-bold text-slate-200 text-xs">{cfg.config_name}</p><span className="text-[9px] font-mono text-slate-500 bg-slate-950 px-1 py-0.5 border border-slate-850 rounded mt-1 block w-fit">{cfg.key}</span></td>
                       <td className="p-4">
                         <div className="relative">
                           <input 
                             type={isSecret && !showPass ? 'password' : 'text'}
-                            className={`w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 font-mono font-semibold focus:outline-none transition ${isSecret ? 'text-amber-400' : 'text-slate-300'}`}
+                            className={`w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 font-mono font-semibold focus:outline-none transition text-xs ${isSecret ? 'text-amber-400 tracking-wider' : 'text-slate-300'}`}
                             value={cfg.value || ''}
                             onChange={(e) => handleInlineValueChange(cfg.key, e.target.value)}
                           />
@@ -242,10 +253,10 @@ export default function AdminSystemSettings() {
                           )}
                         </div>
                       </td>
-                      <td className="p-4 text-slate-400 italic leading-relaxed">{cfg.description || 'Chưa thiết lập ghi chú.'}</td>
-                      <td className="p-4 text-center space-x-1">
-                        <button onClick={() => handleOpenEdit(cfg)} className="p-1.5 bg-slate-950 border border-slate-800 rounded-lg text-blue-400 hover:bg-slate-800 transition"><Sliders className="w-3.5 h-3.5" /></button>
-                        <button onClick={() => handleDeleteConfig(cfg.key, cfg.config_name)} className="p-1.5 bg-slate-950 border border-slate-800 rounded-lg text-red-400 hover:bg-red-950/20 transition"><Trash2 className="w-3.5 h-3.5" /></button>
+                      <td className="p-4 text-slate-400 italic leading-relaxed">{cfg.description || 'Chưa thiết lập ghi chú hướng dẫn.'}</td>
+                      <td className="p-4 text-center space-x-1 font-sans">
+                        <button onClick={() => handleOpenEdit(cfg)} className="p-1.5 bg-slate-950 border border-slate-800 rounded-lg text-blue-400 hover:bg-slate-800 transition" title="Sửa chi tiết"><Sliders className="w-3.5 h-3.5" /></button>
+                        <button onClick={() => handleDeleteConfig(cfg.key, cfg.config_name)} className="p-1.5 bg-slate-950 border border-slate-800 rounded-lg text-red-400 hover:bg-red-950/20 transition" title="Xóa vĩnh viễn"><Trash2 className="w-3.5 h-3.5" /></button>
                       </td>
                     </tr>
                   );
@@ -255,10 +266,10 @@ export default function AdminSystemSettings() {
           </table>
         </div>
 
-        {/* MẪU THANH PHÂN TRANG CAO CẤP THEO YÊU CẦU ĐỒNG BỘ 100% GIAO DIỆN MẪU */}
+        {/* THANH PHÂN TRANG */}
         <div className="p-4 bg-slate-950/50 border-t border-slate-800 flex flex-col md:flex-row justify-between items-center gap-4 text-xs font-mono text-slate-400 select-none">
           <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-start">
-            <button onClick={handleSaveAllInlineChanges} className="bg-emerald-600 hover:bg-emerald-700 text-white font-black px-4 py-2 rounded-xl flex items-center gap-1.5 transition text-[11px] font-sans">
+            <button onClick={handleSaveAllInlineChanges} className="bg-emerald-600 hover:bg-emerald-700 text-white font-black px-4 py-2.5 rounded-xl flex items-center gap-1.5 transition text-[11px] font-sans shadow-md">
               <Save className="w-3.5 h-3.5" /> Lưu dòng chỉnh sửa
             </button>
             <div>Total <span className="text-emerald-400 font-bold">{filteredSettings.length}</span> items</div>
@@ -302,25 +313,25 @@ export default function AdminSystemSettings() {
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 w-full max-w-sm space-y-4 text-xs shadow-2xl relative text-slate-200">
             <div className="flex justify-between items-center border-b border-slate-800 pb-2.5">
-              <h3 className="font-bold uppercase text-blue-500 tracking-wide">{isEditing ? 'Sửa cấu hình' : 'Thêm cấu hình'}</h3>
+              <h3 className="font-bold uppercase text-blue-500 tracking-wide text-[11px]">{isEditing ? '📝 Sửa cấu hình hệ thống' : '✨ Thêm cấu hình hệ thống mới'}</h3>
               <button onClick={() => setShowModal(false)} className="text-slate-500 hover:text-white"><X className="w-5 h-5" /></button>
             </div>
 
             <div className="space-y-3">
               <div>
                 <label className="text-slate-400 font-bold block">Thuộc phân hệ nhóm:</label>
-                <select className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 mt-1.5 text-cyan-400 font-bold focus:outline-none" value={groupName} onChange={(e) => setGroupName(e.target.value)}>
+                <select className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 mt-1.5 text-cyan-400 font-bold focus:outline-none cursor-pointer" value={groupName} onChange={(e) => setGroupName(e.target.value)}>
                   {configGroups.map((g: any) => <option key={g.code} value={g.code}>📁 {g.label}</option>)}
                 </select>
               </div>
-              <div><label className="text-slate-400 font-bold">Tên hiển thị cấu hình:</label><input type="text" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 mt-1.5 focus:outline-none" placeholder="Ví dụ: Số tài khoản nộp vốn" value={configName} onChange={(e) => setConfigName(e.target.value)} /></div>
-              <div><label className="text-slate-400 font-bold">Giá trị (Value):</label><input type="text" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 mt-1.5 font-mono focus:outline-none" placeholder="Nhập tham số..." value={value} onChange={(e) => setValue(e.target.value)} /></div>
-              <div><label className="text-slate-400 font-bold">Mô tả:</label><textarea className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 mt-1.5 h-16 resize-none focus:outline-none text-slate-300" placeholder="Ghi chú hướng dẫn..." value={description} onChange={(e) => setDescription(e.target.value)} /></div>
+              <div><label className="text-slate-400 font-bold">Tên hiển thị cấu hình:</label><input type="text" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 mt-1.5 focus:outline-none text-slate-100 font-semibold text-xs" placeholder="Ví dụ: Số tài khoản nộp vốn" value={configName} onChange={(e) => setConfigName(e.target.value)} /></div>
+              <div><label className="text-slate-400 font-bold">Giá trị tham số (Value):</label><input type="text" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 mt-1.5 font-mono focus:outline-none text-amber-400 font-bold text-xs" placeholder="Nhập tham số..." value={value} onChange={(e) => setValue(e.target.value)} /></div>
+              <div><label className="text-slate-400 font-bold">Mô tả hướng dẫn:</label><textarea className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 mt-1.5 h-16 resize-none focus:outline-none text-slate-300 font-medium leading-relaxed" placeholder="Ghi chú hướng dẫn..." value={description} onChange={(e) => setDescription(e.target.value)} /></div>
             </div>
 
             <div className="pt-2 border-t border-slate-800 flex gap-2">
               <button type="button" onClick={() => setShowModal(false)} className="flex-1 bg-slate-950 border border-slate-800 p-3 rounded-xl font-bold text-slate-400 text-center transition hover:bg-slate-850">Hủy</button>
-              <button type="button" onClick={handleSaveConfig} className="flex-1 bg-blue-600 text-white font-black p-3 rounded-xl shadow-lg">Lưu</button>
+              <button type="button" onClick={handleSaveConfig} className="flex-1 bg-blue-600 text-white font-black p-3 rounded-xl shadow-lg">Lưu tham số</button>
             </div>
           </div>
         </div>

@@ -2,251 +2,235 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { CalendarDays, User, RefreshCcw, ChevronLeft, ChevronRight, X, Clock, CheckCircle2, AlertCircle } from 'lucide-react';
+import { useNotification } from '@/component/NotificationContext';
+import { Calendar as CalendarIcon, Clock, RefreshCcw, LayoutGrid, ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react';
 
-export default function AdminAttendanceCalendar() {
+export default function AdminAttendanceManagement() {
+  const { showToast } = useNotification();
   const [employees, setEmployees] = useState<any[]>([]);
-  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('');
-  const [attendanceLogs, setAttendanceLogs] = useState<any[]>([]);
+  const [shifts, setShifts] = useState<any[]>([]);
+  const [attendanceRecords, setAttendanceRecords] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Điều khiển bộ lọc tháng (Định dạng YYYY-MM)
-  const [monthInput, setMonthInput] = useState(() => {
-    const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-  });
+  const [selectedEmpId, setSelectedEmpId] = useState('');
+  const [selectedShiftName, setSelectedShiftName] = useState('');
+  const [checkType, setCheckType] = useState('IN');
+  const [filterEmployeeId, setFilterEmployeeId] = useState('ALL');
 
-  const year = Number(monthInput.split('-')[0]);
-  const month = Number(monthInput.split('-')[1]);
+  const [currentMonth, setCurrentMonth] = useState(new Date().getMonth()); 
+  const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
 
-  // States quản lý Popup Xếp Ca / Đổi Ca làm việc cho thợ
-  const [showShiftModal, setShowShiftModal] = useState(false);
-  const [clickedDay, setClickedDay] = useState<number | null>(null);
-  const [selectedShiftId, setSelectedShiftId] = useState<number>(1); // Mặc định ca 1
+  const [showPickerPopup, setShowPickerPopup] = useState(false);
+  const [pickerDate, setPickerDate] = useState(new Date());
+  const [pickerHour, setPickerHour] = useState('08');
+  const [pickerMinute, setPickerMinute] = useState('00');
+  const [pickerPeriod, setPickerPeriod] = useState('AM');
 
-  const loadInitialData = async () => {
+  const loadData = async () => {
     setLoading(true);
     try {
-      // 1. Kéo toàn bộ danh sách thợ đang hoạt động để sếp chọn lọc trên dropdown
-      const { data: emps } = await supabase.from('employees').select('id, full_name').eq('status', 'ACTIVE').order('id', { ascending: true });
+      const { data: emps } = await supabase.from('employees').select('id, full_name, title');
       setEmployees(emps || []);
-      
-      if (emps && emps.length > 0 && !selectedEmployeeId) {
-        setSelectedEmployeeId(emps[0].id.toString());
+      const { data: sfs } = await supabase.from('shifts').select('*');
+      let finalShifts = sfs || [];
+      if (!finalShifts.some(s => s.shift_name.includes('Tối'))) {
+        finalShifts.push({ id: 't_mock', shift_name: 'Ca Tối', start_time: '18:00:00', end_time: '22:00:00' });
       }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
+      setShifts(finalShifts);
+      if (finalShifts.length > 0 && !selectedShiftName) setSelectedShiftName(finalShifts[0].shift_name);
+      const { data: atts } = await supabase.from('attendance').select('*').order('work_date', { ascending: false });
+      setAttendanceRecords(atts || []);
+    } catch (error) { console.error(error); }
+    setLoading(false);
   };
 
-  const loadAttendanceCalendar = async () => {
-    if (!selectedEmployeeId) return;
-    setLoading(true);
+  useEffect(() => { loadData(); }, []);
+
+  const getFormattedTime24h = () => {
+    let hour = parseInt(pickerHour);
+    if (pickerPeriod === 'PM' && hour !== 12) hour += 12;
+    if (pickerPeriod === 'AM' && hour === 12) hour = 0;
+    return `${String(hour).padStart(2, '0')}:${pickerMinute}:00`;
+  };
+
+  const handleAdminCheckIn = async () => {
+    if (!selectedEmpId) return showToast('Thiếu thông tin', 'Vui lòng chọn thợ cần tính công!', 'error');
+    const emp = employees.find(e => String(e.id) === String(selectedEmpId));
+    if (!emp) return;
+
+    const targetDateStr = pickerDate.toLocaleDateString('en-CA');
+    const targetTimeStr = getFormattedTime24h();
+
     try {
-      // Định dạng ngày bắt đầu và kết thúc tháng để quét DB
-      const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
-      const endDate = `${year}-${String(month).padStart(2, '0')}-${new Date(year, month, 0).getDate()}`;
+      const { data: existing } = await supabase.from('attendance').select('*').eq('employee_id', emp.id).eq('work_date', targetDateStr).eq('shift_name', selectedShiftName).maybeSingle();
 
-      // 2. Truy vấn nhật ký chấm công ca của thợ được chọn trong tháng đó
-      const { data: logs } = await supabase
-        .from('attendance_log')
-        .select('*')
-        .eq('employee_id', Number(selectedEmployeeId))
-        .gte('work_date', startDate)
-        .lte('work_date', endDate);
-        
-      setAttendanceLogs(logs || []);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
+      if (checkType === 'IN') {
+        if (existing) await supabase.from('attendance').update({ check_in: targetTimeStr }).eq('id', existing.id);
+        else await supabase.from('attendance').insert([{ employee_id: emp.id, employee_name: emp.full_name, work_date: targetDateStr, check_in: targetTimeStr, shift_name: selectedShiftName, status: 'PRESENT' }]);
+        setCheckType('OUT');
+      } else {
+        if (existing) await supabase.from('attendance').update({ check_out: targetTimeStr }).eq('id', existing.id);
+        else await supabase.from('attendance').insert([{ employee_id: emp.id, employee_name: emp.full_name, work_date: targetDateStr, check_out: targetTimeStr, shift_name: selectedShiftName, status: 'PRESENT' }]);
+        setCheckType('IN');
+      }
+      showToast('Đồng bộ thành công', `Đã lưu thông số công ca cho thợ [${emp.full_name}] xuống hệ thống.`, 'success');
+      loadData();
+    } catch (err: any) { showToast('Lỗi kết nối', err.message, 'error'); }
   };
 
-  useEffect(() => { loadInitialData(); }, []);
-  useEffect(() => { loadAttendanceCalendar(); }, [selectedEmployeeId, monthInput]);
+  const handleGridDayClick = (dayStr: string) => {
+    const clickedDate = new Date(dayStr);
+    setPickerDate(clickedDate);
+ };
 
-  // THUẬT TOÁN XỬ LÝ LỊCH VẠN NIÊN CHO XƯỞNG
-  const daysInMonth = new Date(year, month, 0).getDate();
-  const firstDayIndex = new Date(year, month - 1, 1).getDay(); // Ngày đầu tháng rơi vào thứ mấy (0: Chủ nhật)
-  const adjustedFirstDayIndex = firstDayIndex === 0 ? 6 : firstDayIndex - 1; // Ép Thứ 2 lên đầu bảng
-
-  const totalCells = [];
-  // Nạp ô trống đệm cho các ngày của tháng trước
-  for (let i = 0; i < adjustedFirstDayIndex; i++) { totalCells.push(null); }
-  // Nạp toàn bộ các ngày thực tế của tháng này
-  for (let i = 1; i <= daysInMonth; i++) { totalCells.push(i); }
-
-  // HÀM: BẬT POPUP KHI CLICK VÀO Ô LỊCH ĐỂ XẾP CA CHO THỢ
-  const handleDayClick = (day: number) => {
-    const formattedDate = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    const existingLog = attendanceLogs.find(l => l.work_date === formattedDate);
-    
-    setClickedDay(day);
-    setSelectedShiftId(existingLog ? existingLog.shift_id : 1);
-    setShowShiftModal(true);
-  };
-
-  // HÀM: LƯU HOẶC HỦY CA LÀM VIỆC LÊN CLOUD DATABASE
-  const handleSaveShift = async () => {
-    if (!clickedDay || !selectedEmployeeId) return;
-    const formattedDate = `${year}-${String(month).padStart(2, '0')}-${String(clickedDay).padStart(2, '0')}`;
-
-    if (selectedShiftId === 0) {
-      // Nếu sếp chọn "0 - Báo Nghỉ" ➔ Xóa dòng chấm công ca đó khỏi DB
-      await supabase.from('attendance_log').delete().eq('employee_id', Number(selectedEmployeeId)).eq('work_date', formattedDate);
-    } else {
-      // Tiến hành chèn mới hoặc cập nhật đè (Upsert) nếu thợ đã đổi ca
-      await supabase.from('attendance_log').upsert({
-        employee_id: Number(selectedEmployeeId),
-        work_date: formattedDate,
-        shift_id: selectedShiftId,
-        clock_in: selectedShiftId === 1 ? '08:00' : selectedShiftId === 2 ? '13:30' : '18:00',
-        status: 'SCHEDULED'
-      }, { onConflict: 'employee_id,work_date' });
-    }
-
-    setShowShiftModal(false);
-    loadAttendanceCalendar();
-    alert('✨ Hệ thống đã cập nhật và nạp lịch ca thợ thành công!');
-  };
-
-  // Tính số ngày công thợ đã đi làm trong tháng để sếp tiện đối soát
-  const totalDaysScheduled = attendanceLogs.filter(l => l.shift_id > 0).length;
+  const firstDayOfMonth = new Date(currentYear, currentMonth, 1).getDay();
+  const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6 text-slate-100 bg-slate-950 min-h-screen font-sans">
-      
-      {/* HEADER BỘ LỌC ĐIỀU KHIỂN HỢP NHẤT */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-slate-800 pb-4 gap-4">
-        <div className="flex items-center gap-2">
-          <CalendarDays className="w-5 h-5 text-blue-500" />
-          <div>
-            <h1 className="text-base font-bold">Lịch Chấm Công Ca & Phân Bổ Ca Trực Chuỗi</h1>
-            <p className="text-[11px] text-slate-400 mt-0.5">Click trực tiếp lên ngày để sắp ca, đổi lịch trực hoặc báo nghỉ cho thợ xưởng</p>
-          </div>
-        </div>
-
-        {/* CỤM ĐIỀU KHIỂN TRA CỨU NHANH */}
-        <div className="flex flex-wrap gap-2 w-full md:w-auto items-center">
-          <div className="bg-slate-900 border border-slate-800 px-3 py-2 rounded-xl text-xs font-mono flex items-center gap-1.5 w-full sm:w-auto">
-            <span className="text-slate-500 font-bold">KỲ:</span>
-            <input type="month" className="bg-slate-950 border border-slate-800 rounded p-1 text-slate-200 focus:outline-none [color-scheme:dark] font-bold" value={monthInput} onChange={(e) => setMonthInput(e.target.value)} />
-          </div>
-
-          <div className="bg-slate-900 border border-slate-800 px-3 py-2 rounded-xl text-xs flex items-center gap-1.5 w-full sm:w-auto">
-            <User className="w-4 h-4 text-purple-400" />
-            <span className="text-slate-500 font-bold whitespace-nowrap">THỢ:</span>
-            <select className="bg-slate-950 border border-slate-800 rounded-lg p-1 text-xs text-blue-400 font-black focus:outline-none w-full sm:w-44" value={selectedEmployeeId} onChange={(e) => setSelectedEmployeeId(e.target.value)}>
-              {employees.map(e => <option key={e.id} value={e.id}>👤 {e.full_name}</option>)}
-            </select>
-          </div>
-        </div>
+    <div className="p-6 max-w-7xl mx-auto space-y-6 text-slate-100 bg-slate-950 min-h-screen font-sans">
+      <div className="flex justify-between items-center border-b border-slate-800 pb-4">
+        <h1 className="text-base font-bold flex items-center gap-2"><CalendarIcon className="w-5 h-5 text-purple-500" /> Bảng Điều Hành Chấm Công Admin</h1>
+        <button onClick={loadData} className="p-2 bg-slate-900 border border-slate-800 rounded-xl text-slate-400"><RefreshCcw className="w-4 h-4"/></button>
       </div>
 
-      {/* THẺ PHÂN TÍCH NHANH CÔNG THỢ */}
-      <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl flex justify-between items-center max-w-sm text-xs font-bold uppercase tracking-wider shadow-md">
-        <div>
-          <p className="text-slate-500 text-[10px]">Tổng số ca xếp trong kỳ {month}/{year}</p>
-          <p className="text-base font-black text-emerald-400 font-mono mt-1">✓ {totalDaysScheduled} Ca Làm Việc</p>
-        </div>
-        <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400"><CheckCircle2 className="w-5 h-5" /></div>
-      </div>
-
-      {/* KHUNG BẢNG LỊCH CHẤM CÔNG CA CHUYÊN NGHIỆP */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-2xl space-y-4">
-        
-        {/* TIÊU ĐỀ THỨ TRONG TUẦN */}
-        <div className="grid grid-cols-7 gap-2 text-center text-[10px] font-black uppercase text-slate-500 tracking-widest border-b border-slate-800/60 pb-3">
-          <div>Thứ 2</div><div>Thứ 3</div><div>Thứ 4</div><div>Thứ 5</div><div>Thứ 6</div><div>Thứ 7</div><div className="text-red-400/80">Chủ Nhật</div>
-        </div>
-
-        {/* GRID CÁC Ô NGÀY - TÍCH HỢP BADGE CA TO RÕ NÉT (SỬA LỖI SỐ 1 BÉ) */}
-        <div className="grid grid-cols-7 gap-2">
-          {totalCells.map((day, idx) => {
-            if (day === null) {
-              return <div key={`empty-${idx}`} className="bg-slate-950/20 border border-transparent rounded-xl h-16" />;
-            }
-
-            const formattedDate = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-            const matchedLog = attendanceLogs.find(l => l.work_date === formattedDate);
-            const currentShiftId = matchedLog ? matchedLog.shift_id : null;
-
-            return (
-              <div 
-                key={`day-${day}`} 
-                onClick={() => handleDayClick(day)}
-                className="relative bg-slate-950 border border-slate-800/80 rounded-xl h-16 flex items-center justify-center font-mono font-bold hover:border-blue-500/50 hover:bg-slate-900/40 transition cursor-pointer group"
-              >
-                {/* Số ngày chính giữa bảng */}
-                <span className="text-xs text-slate-400 group-hover:text-white transition">{day}</span>
-
-                {/* SỐ HIỆU CA TO RÕ NÉT PHỦ GÓC (ĐÃ SỬA LỖI MẮT KHÔNG NHÌN THẤY) */}
-                {currentShiftId && (
-                  <span className={`absolute top-1 right-1 w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-black text-slate-950 shadow-lg scale-105 border ${
-                    currentShiftId === 1 ? 'bg-amber-400 border-amber-300' : currentShiftId === 2 ? 'bg-cyan-400 border-cyan-300' : 'bg-purple-400 border-purple-300'
-                  }`} title={`Thợ trực ca số: ${currentShiftId}`}>
-                    {currentShiftId}
-                  </span>
-                )}
-
-                {/* Chỉ báo chấm công chân đáy */}
-                {currentShiftId && <div className="absolute bottom-1 w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />}
-              </div>
-            );
-          })}
-        </div>
-
-        {/* CHÚ THÍCH CÁC CA DƯỚI ĐÁY LỊCH */}
-        <div className="pt-3 border-t border-slate-800/60 flex flex-wrap gap-4 text-[10px] font-bold uppercase tracking-wider text-slate-500">
-          <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-amber-400" /> Ca 1 (08h00 - 12h00)</div>
-          <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-cyan-400" /> Ca 2 (13h30 - 17h30)</div>
-          <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-purple-400" /> Ca 3 (18h00 - 22h00)</div>
-        </div>
-      </div>
-
-      {/* POPUP XẾP LỊCH CA HOẶC BÁO NGHỈ CHO THỢ */}
-      {showShiftModal && clickedDay && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 w-full max-w-xs space-y-4 text-xs relative text-slate-200">
-            <button onClick={() => setShowShiftModal(false)} className="absolute top-4 right-4 text-slate-500 hover:text-white"><X className="w-5 h-5" /></button>
-            
-            <div className="border-b border-slate-800 pb-2">
-              <h3 className="font-black text-xs uppercase tracking-wider text-blue-400">📅 Phân bổ ca làm việc</h3>
-              <p className="text-[10px] text-slate-500 font-mono mt-0.5">Ngày: {clickedDay}/{month}/{year}</p>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4 shadow-xl">
+          <h2 className="text-xs font-black uppercase tracking-wider text-purple-400 flex items-center gap-1.5 border-b border-slate-800 pb-3"><Clock className="w-4 h-4" /> Điểm danh thủ công Admin</h2>
+          
+          <div className="space-y-3 text-xs">
+            <div>
+              <label className="text-slate-400 font-bold block mb-1">1. Chọn thành viên xưởng:</label>
+              <select className="w-full bg-slate-950 border border-slate-800 p-3 rounded-xl text-slate-200 focus:outline-none cursor-pointer" value={selectedEmpId} onChange={e => setSelectedEmpId(e.target.value)}>
+                <option value="">-- Click chọn thợ xưởng --</option>
+                {employees.map(e => <option key={e.id} value={e.id}>{e.full_name} ({e.title})</option>)}
+              </select>
             </div>
 
-            <div className="space-y-3">
-              <label className="text-slate-400 font-bold block">Chọn khung ca trực cho thợ:</label>
-              <div className="space-y-2 font-semibold">
-                <label className="flex items-center gap-2 p-2.5 bg-slate-950 border border-slate-800 rounded-xl hover:border-amber-400 transition cursor-pointer">
-                  <input type="radio" name="shift_select" checked={selectedShiftId === 1} onChange={() => setSelectedShiftId(1)} className="accent-amber-400" />
-                  <span className="text-amber-400 font-bold font-mono">Ca 1</span> <span className="text-slate-400 text-[11px]">(Sáng 8h-12h)</span>
-                </label>
-                <label className="flex items-center gap-2 p-2.5 bg-slate-950 border border-slate-800 rounded-xl hover:border-cyan-400 transition cursor-pointer">
-                  <input type="radio" name="shift_select" checked={selectedShiftId === 2} onChange={() => setSelectedShiftId(2)} className="accent-cyan-400" />
-                  <span className="text-cyan-400 font-bold font-mono">Ca 2</span> <span className="text-slate-400 text-[11px]">(Chiều 13h30-17h30)</span>
-                </label>
-                <label className="flex items-center gap-2 p-2.5 bg-slate-950 border border-slate-800 rounded-xl hover:border-purple-400 transition cursor-pointer">
-                  <input type="radio" name="shift_select" checked={selectedShiftId === 3} onChange={() => setSelectedShiftId(3)} className="accent-purple-400" />
-                  <span className="text-purple-400 font-bold font-mono">Ca 3</span> <span className="text-slate-400 text-[11px]">(Tối 18h-22h)</span>
-                </label>
-                <label className="flex items-center gap-2 p-2.5 bg-slate-950 border border-red-900/50 rounded-xl hover:border-red-500 transition cursor-pointer bg-red-950/10">
-                  <input type="radio" name="shift_select" checked={selectedShiftId === 0} onChange={() => setSelectedShiftId(0)} className="accent-red-500" />
-                  <span className="text-red-400 font-bold font-mono">Ca 0</span> <span className="text-slate-500 text-[11px]">(Báo nghỉ / Xóa ca)</span>
-                </label>
+            <div>
+              <label className="text-slate-400 font-bold block mb-1">2. Chọn ca kíp trực:</label>
+              <select className="w-full bg-slate-950 border border-slate-800 p-3 rounded-xl text-slate-200 focus:outline-none cursor-pointer" value={selectedShiftName} onChange={e => setSelectedShiftName(e.target.value)}>
+                {shifts.map(s => <option key={s.id} value={s.shift_name}>⚙️ {s.shift_name}</option>)}
+              </select>
+            </div>
+
+            <div className="relative">
+              <label className="text-slate-400 font-bold block mb-1"><CalendarDays className="w-3.5 h-3.5 text-purple-400 inline mr-1" />3. Cấu hình Ngày & Giờ (Bản vị số hóa):</label>
+              <div onClick={() => setShowPickerPopup(!showPickerPopup)} className="w-full bg-slate-950 border border-slate-800 p-3 rounded-xl font-mono text-purple-400 font-bold text-center cursor-pointer hover:border-purple-500 transition">
+                📅 {pickerDate.toLocaleDateString('vi-VN')} — ⏱️ {pickerHour}:{pickerMinute} {pickerPeriod}
+              </div>
+
+              {showPickerPopup && (
+                <div className="absolute left-0 right-0 mt-2 bg-slate-900 border border-purple-500/40 p-4 rounded-2xl shadow-2xl z-50 space-y-3 animate-fadeIn">
+                  <div className="flex justify-between items-center border-b border-slate-800 pb-2">
+                    <span className="font-black text-purple-400 text-[10px] uppercase">Bảng điều phối mốc thời gian</span>
+                    <button onClick={() => setShowPickerPopup(false)} className="text-slate-400 hover:text-white font-bold text-xs">OK</button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 items-center">
+                    <div>
+                      <label className="text-[10px] text-slate-500 font-bold uppercase block mb-1">Đổi ngày lùi:</label>
+                      <input type="date" className="w-full bg-slate-950 p-2 rounded-lg border border-slate-800 text-[11px] text-slate-200 font-mono focus:outline-none" value={pickerDate.toLocaleDateString('en-CA')} onChange={(e) => { if(e.target.value) setPickerDate(new Date(e.target.value)) }} />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-slate-500 font-bold uppercase block mb-1">Khung giờ:</label>
+                      <div className="flex gap-1 bg-slate-950 p-1 rounded-lg border border-slate-800 text-center font-mono font-bold text-xs">
+                        <select className="bg-transparent focus:outline-none cursor-pointer w-1/3 text-amber-400" value={pickerHour} onChange={e => setPickerHour(e.target.value)}>
+                          {Array.from({length: 12}, (_, i) => String(i+1).padStart(2,'0')).map(h => <option key={h} value={h}>{h}</option>)}
+                        </select>
+                        <span>:</span>
+                        <select className="bg-transparent focus:outline-none cursor-pointer w-1/3 text-amber-400" value={pickerMinute} onChange={e => setPickerMinute(e.target.value)}>
+                          {Array.from({length: 60}, (_, i) => String(i).padStart(2,'0')).map(m => <option key={m} value={m}>{m}</option>)}
+                        </select>
+                        <select className="bg-transparent focus:outline-none cursor-pointer w-1/3 text-purple-400" value={pickerPeriod} onChange={e => setPickerPeriod(e.target.value)}>
+                          <option value="AM">AM</option><option value="PM">PM</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div>
+              <label className="text-slate-400 font-bold block mb-1">4. Trạng thái ca kíp:</label>
+              <div className="grid grid-cols-2 gap-2 mt-1">
+                <button onClick={() => setCheckType('IN')} className={`p-2.5 rounded-xl font-black text-[11px] transition ${checkType === 'IN' ? 'bg-emerald-600 text-white shadow-lg' : 'bg-slate-950 text-slate-500 border border-slate-850'}`}>🟢 VÀO CA</button>
+                <button onClick={() => setCheckType('OUT')} className={`p-2.5 rounded-xl font-black text-[11px] transition ${checkType === 'OUT' ? 'bg-red-600 text-white shadow-lg' : 'bg-slate-950 text-slate-500 border border-slate-850'}`}>🔴 RỜI CA</button>
               </div>
             </div>
-
-            <div className="pt-2 border-t border-slate-800 flex gap-2">
-              <button onClick={() => setShowShiftModal(false)} className="flex-1 bg-slate-950 border border-slate-800 p-2.5 rounded-xl font-bold text-slate-500">Hủy</button>
-              <button onClick={ someId => handleSaveShift()} className="flex-1 bg-blue-600 hover:bg-blue-700 p-2.5 rounded-xl font-black uppercase text-white shadow-lg tracking-wider">Xác Nhận</button>
-            </div>
+            <button onClick={handleAdminCheckIn} className="w-full bg-purple-600 hover:bg-purple-700 text-white font-black p-3 rounded-xl transition text-xs shadow-lg">✓ Thực thi hạch toán Cloud</button>
           </div>
         </div>
-      )}
 
+        <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-5 border-b border-slate-800/60 pb-3">
+            <h2 className="text-sm font-black text-slate-100 uppercase tracking-wide flex items-center gap-1.5"><LayoutGrid className="w-4 h-4 text-purple-400" /> Bảng phân lịch đối soát ca trực</h2>
+            <div className="flex flex-wrap items-center gap-3 w-full md:w-auto justify-end">
+              <select className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-300 focus:outline-none cursor-pointer" value={filterEmployeeId} onChange={e => setFilterEmployeeId(e.target.value)}>
+                <option value="ALL">👥 Tất cả nhân sự</option>
+                {employees.map(e => <option key={e.id} value={e.id}>👤 {e.full_name}</option>)}
+              </select>
+
+              <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
+                <button onClick={() => { if(currentMonth===0){setCurrentMonth(11); setCurrentYear(y=>y-1);}else{setCurrentMonth(m=>m-1);} }} className="p-1 text-slate-400 hover:text-white"><ChevronLeft className="w-4 h-4"/></button>
+                <span className="text-xs font-black font-mono px-2 text-purple-400 uppercase select-none w-28 text-center">THÁNG {currentMonth + 1} / {currentYear}</span>
+                <button onClick={() => { if(currentMonth===11){setCurrentMonth(0); setCurrentYear(y=>y+1);}else{setCurrentMonth(m=>m+1);} }} className="p-1 text-slate-400 hover:text-white"><ChevronRight className="w-4 h-4"/></button>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-7 gap-1.5 text-center text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2 select-none">
+            <div>CN</div><div>T2</div><div>T3</div><div>T4</div><div>T5</div><div>T6</div><div>T7</div>
+          </div>
+
+          <div className="grid grid-cols-7 gap-2">
+            {Array.from({ length: firstDayOfMonth }).map((_, i) => <div key={`empty-${i}`} className="bg-slate-950/20 border border-transparent min-h-[75px] rounded-xl opacity-20"></div>)}
+
+            {Array.from({ length: daysInMonth }).map((_, i) => {
+              const day = i + 1;
+              const currentLoopDateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+              let rawDayRecords = attendanceRecords.filter(r => r.work_date === currentLoopDateStr);
+              if (filterEmployeeId !== 'ALL') rawDayRecords = rawDayRecords.filter(r => String(r.employee_id) === String(filterEmployeeId));
+
+              const uniqueDayRecordsMap: { [key: string]: any } = {};
+              rawDayRecords.forEach(rec => {
+                const uniqueKey = `${rec.employee_id}-${rec.shift_name}`;
+                if (!uniqueDayRecordsMap[uniqueKey]) uniqueDayRecordsMap[uniqueKey] = { ...rec };
+                else {
+                  if (rec.check_in && !uniqueDayRecordsMap[uniqueKey].check_in) uniqueDayRecordsMap[uniqueKey].check_in = rec.check_in;
+                  if (rec.check_out && !uniqueDayRecordsMap[uniqueKey].check_out) uniqueDayRecordsMap[uniqueKey].check_out = rec.check_out;
+                }
+              });
+
+              const processedDayRecords = Object.values(uniqueDayRecordsMap);
+
+              return (
+                <div key={`day-${day}`} onClick={() => handleGridDayClick(currentLoopDateStr)} className={`group relative min-h-[85px] p-2 rounded-xl bg-slate-950 border transition-all flex flex-col justify-between cursor-pointer ${processedDayRecords.length > 0 ? 'border-purple-900/40 bg-gradient-to-b from-slate-950 to-purple-950/10 shadow-lg' : 'border-slate-850 hover:border-slate-700'}`}>
+                  <span className={`text-[11px] font-mono font-black ${processedDayRecords.length > 0 ? 'text-purple-400' : 'text-slate-400'}`}>{day}</span>
+                  <div>{processedDayRecords.length > 0 && <span className="block text-[8px] bg-purple-500/10 text-purple-400 border border-purple-500/20 rounded px-1 py-0.5 font-bold uppercase truncate">👥 {processedDayRecords.length} lượt ca</span>}</div>
+
+                  {processedDayRecords.length > 0 && (
+                    <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block bg-slate-900 border border-purple-500/40 p-3 rounded-xl shadow-2xl text-[10px] w-56 z-50 text-left space-y-1.5 font-sans">
+                      <p className="font-black text-purple-400 border-b border-slate-800 pb-1 font-mono uppercase tracking-wider">📅 Chi tiết ngày {day}/{currentMonth + 1}:</p>
+                      <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+                        {processedDayRecords.map((rec: any, rIdx) => (
+                          <div key={rec.id || rIdx} className="border-b border-slate-850/50 pb-1.5 last:border-none last:pb-0">
+                            <p className="font-black text-slate-200">👤 {rec.employee_name}</p>
+                            <p className="text-[9px] text-amber-400 font-medium font-mono">⏰ Ca: {rec.shift_name}</p>
+                            <div className="grid grid-cols-2 gap-1 font-mono text-[9px] mt-0.5">
+                              <span className="text-emerald-400 font-bold">Vào: {rec.check_in ? rec.check_in.slice(0,5) : '--:--'}</span>
+                              <span className="text-red-400 font-bold">Ra: {rec.check_out ? rec.check_out.slice(0,5) : '--:--'}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
