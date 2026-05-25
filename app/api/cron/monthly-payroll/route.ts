@@ -18,8 +18,6 @@ export async function GET(request: Request) {
       // Xử lý thay thế biến động trong HTML (Ví dụ thay {{hoTen}} thành tên sếp)
       let personalizedHtml = template.html_content.replace(/{{hoTen}}/g, manager.full_name);
       
-      // LOGIC KÍCH HOẠT SMTP GỬI MAIL SẼ NẰM Ở ĐÂY
-      console.log(`[SMTP] Bắn mail gọi vốn tới: ${manager.email} | Tiêu đề: ${template.subject}`);
     }
 
     return NextResponse.json({ success: true, message: 'Đã bắn lệnh gọi vốn tự động thành công!' });

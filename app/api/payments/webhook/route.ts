@@ -50,10 +50,6 @@ export async function POST(request: Request) {
         .eq('id', expenseId);
 
       if (error) throw error;
-
-      console.log(
-        `[HỆ THỐNG CHI TIÊU] Mã phản hồi QR hợp lệ. Tự động gạch nợ chi phí văn phòng.`
-      );
     }
 
     return NextResponse.json({
