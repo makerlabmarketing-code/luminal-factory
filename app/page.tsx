@@ -16,30 +16,30 @@ export default function GatewayPage() {
         </div>
 
         <div className="grid gap-4">
-          {/* Nút vào vai Admin */}
+          {/* Vai trò Điều hành tối cao */}
           <Link href="/admin/dashboard" className="group p-6 bg-slate-900 border border-slate-800 rounded-2xl hover:border-blue-500/50 transition flex items-center gap-4 text-left shadow-xl">
             <div className="p-3 bg-blue-600/10 text-blue-500 rounded-xl group-hover:bg-blue-600 group-hover:text-white transition">
               <ShieldCheck className="w-6 h-6" />
             </div>
             <div>
               <h3 className="font-bold text-white">Dành cho Admin</h3>
-              <p className="text-xs text-slate-500">Quản lý lương, góp vốn, quy trình</p>
+              <p className="text-xs text-slate-500">Quản lý lương, góp vốn, quy trình xưởng</p>
             </div>
           </Link>
 
-          {/* Nút vào vai Nhân viên */}
-          <Link href="/staff/tasks" className="group p-6 bg-slate-900 border border-slate-800 rounded-2xl hover:border-amber-500/50 transition flex items-center gap-4 text-left shadow-xl">
+          {/* 🔥 ĐÃ VÁ LỖI NOTFOUND: Điều hướng trực tiếp thợ về Portal trung tâm */}
+          <Link href="/staff/portal" className="group p-6 bg-slate-900 border border-slate-800 rounded-2xl hover:border-amber-500/50 transition flex items-center gap-4 text-left shadow-xl">
             <div className="p-3 bg-amber-600/10 text-amber-500 rounded-xl group-hover:bg-amber-600 group-hover:text-white transition">
               <Users className="w-6 h-6" />
             </div>
             <div>
               <h3 className="font-bold text-white">Dành cho Nhân sự</h3>
-              <p className="text-xs text-slate-500">Chấm công, làm checklist, báo cáo QC</p>
+              <p className="text-xs text-slate-500">Chấm công, làm checklist, nhận việc ca máy</p>
             </div>
           </Link>
         </div>
 
-        <p className="text-[10px] text-slate-600 font-bold uppercase tracking-widest">Version 1.0.0 Alpha - Secured by Supabase</p>
+        <p className="text-[10px] text-slate-600 font-bold uppercase tracking-widest">Version 1.0.0 Realtime - Secured by Supabase</p>
       </div>
     </div>
   );
