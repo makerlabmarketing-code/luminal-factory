@@ -51,7 +51,7 @@ export default function MetadataManagement() {
   }));
 
   const filteredRows = rowsWithGlobalIndex.filter((row: any) => {
-    return Object.keys(row).some(key => {
+    return Object.keys(row).some((key: string) => { 
       if (key === '__globalIndex') return false;
       return String(row[key]).toLowerCase().includes(subSearchTerm.toLowerCase());
     });
@@ -177,20 +177,25 @@ export default function MetadataManagement() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/50">
-              {paginatedRows.length === 0 ? (
-                <tr><td colSpan={tableHeaders.length + 1} className="p-8 text-center text-slate-500 font-mono italic">Chưa có hàng dữ liệu con nào khớp bộ lọc tra cứu.</td></tr>
-              ) : paginatedRows.map((row) => (
-                <tr key={row.__globalIndex} className="hover:bg-slate-950/30 transition">
-                  {tableHeaders.map((key) => (
-                    <td key={key} className="p-3">
-                      <input type={key === 'rate' ? 'number' : 'text'} className="w-full bg-slate-950/70 border border-slate-800 rounded-xl p-2.5 text-xs text-slate-100 focus:outline-none font-medium" value={row[key] !== undefined ? row[key] : ''} onChange={(e) => handleUpdateRowValue(row.__globalIndex, key, e.target.value)} />
-                    </td>
-                  ))}
-                  <td className="p-3 text-center">
-                    <button onClick={() => handleRemoveRow(row.__globalIndex)} className="p-2 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition"><Trash2 className="w-4 h-4" /></button>
+            {paginatedRows.length === 0 ? (
+              <tr><td colSpan={tableHeaders.length + 1} className="p-8 text-center text-slate-500 font-mono italic">Chưa có hàng dữ liệu con nào khớp bộ lọc tra cứu.</td></tr>
+            ) : paginatedRows.map((row: any) => ( // 🟢 SỬA TẠI ĐÂY: Thêm ": any" vào sau biến row để triệt tiêu lỗi Implicit Any
+              <tr key={row.__globalIndex} className="hover:bg-slate-950/30 transition">
+                {tableHeaders.map((key) => (
+                  <td key={key} className="p-3">
+                    <input 
+                      type={key === 'rate' ? 'number' : 'text'} 
+                      className="w-full bg-slate-950/70 border border-slate-800 rounded-xl p-2.5 text-xs text-slate-100 focus:outline-none font-medium" 
+                      value={row[key] !== undefined ? row[key] : ''} 
+                      onChange={(e) => handleUpdateRowValue(row.__globalIndex, key, e.target.value)} 
+                    />
                   </td>
-                </tr>
-              ))}
+                ))}
+                <td className="p-3 text-center">
+                  <button onClick={() => handleRemoveRow(row.__globalIndex)} className="p-2 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition"><Trash2 className="w-4 h-4" /></button>
+                </td>
+              </tr>
+            ))}
             </tbody>
           </table>
         </div>
