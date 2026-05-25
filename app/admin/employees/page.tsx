@@ -93,7 +93,7 @@ export default function AdminEmployeesManagement() {
 
   const handleCopyLink = (token: string) => {
     if (!token) return showToast('Lỗi', 'Nhân sự này chưa được cấp token định danh!', 'error');
-    const url = `${window.location.origin}/staff/portal?token=${token}`;
+    const url = `${window.location.origin}/staff/attendance?token=${token}`;
     navigator.clipboard.writeText(url);
     showToast('Đã sao chép', 'Đã sao chép liên kết Cổng Portal gửi cho nhân viên!', 'success');
   };
