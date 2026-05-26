@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useNotification } from '@/component/NotificationContext';
-import { ClipboardList, Plus, Trash2, Search, ChevronLeft, ChevronRight, X, Layers, Eye, Link as LinkIcon, MessageSquare, Clock, Calendar, Save, ExternalLink, Activity, CheckSquare } from 'lucide-react';
+import { ClipboardList, Plus, Trash2, Search, ChevronLeft, ChevronRight, X, Layers, Eye, Link as LinkIcon, MessageSquare, Clock, Calendar, Save, ExternalLink, Activity, CheckSquare, RefreshCcw } from 'lucide-react';
 
 export default function AdminTaskWorkflowDashboard() {
   const { showToast, showConfirm } = useNotification();
@@ -47,6 +47,11 @@ export default function AdminTaskWorkflowDashboard() {
   };
 
   useEffect(() => { loadData(); }, []);
+
+  const handleManualRefresh = async () => {
+    await loadData();
+    showToast('Hệ thống', 'Đã đồng bộ dữ liệu xưởng mới nhất!', 'success');
+  };
 
   const handleOpenAddModal = () => {
     setNewProjectName('');
@@ -120,8 +125,14 @@ export default function AdminTaskWorkflowDashboard() {
     try {
       const { error } = await supabase.from('system_settings').update({ value: newStatus }).eq('key', taskKey);
       if (error) throw error;
-      showToast('Đã cập nhật', 'Trạng thái giai đoạn thay đổi', 'success');
-      loadData();
+      
+      // Cập nhật nóng mảng popup chi tiết để sếp thấy đổi màu trạng thái luôn
+      setActiveProjectPhases(prev => prev.map(p => p.key === taskKey ? { ...p, value: newStatus } : p));
+      showToast('Đã cập nhật', 'Trạng thái giai đoạn thay đổi thành công!', 'success');
+      
+      // Đồng bộ nạp dữ liệu cho bảng tổng bên ngoài cập nhật % theo Phase ngay lập tức
+      const { data: tList } = await supabase.from('system_settings').select('*').eq('group_name', 'PRODUCTION_WORKFLOW').order('key', { ascending: true });
+      if (tList) setTasks(tList);
     } catch (e: any) { showToast('Lỗi', e.message, 'error'); }
   };
 
@@ -149,10 +160,14 @@ export default function AdminTaskWorkflowDashboard() {
       try { currentJSON = JSON.parse(rawDescription || '{}'); } catch {}
       currentJSON.tasks_list[taskIdx][field] = value;
 
-      const { error } = await supabase.from('system_settings').update({ description: JSON.stringify(currentJSON) }).eq('key', phaseKey);
+      const updatedDescription = JSON.stringify(currentJSON);
+
+      const { error } = await supabase.from('system_settings').update({ description: updatedDescription }).eq('key', phaseKey);
       if (error) throw error;
       
-      setActiveProjectPhases(prev => prev.map(p => p.key === phaseKey ? { ...p, description: JSON.stringify(currentJSON) } : p));
+      // Đồng bộ nóng mảng chi tiết đang mở trong popup của Admin
+      setActiveProjectPhases(prev => prev.map(p => p.key === phaseKey ? { ...p, description: updatedDescription } : p));
+      
       const { data: updatedList } = await supabase.from('system_settings').select('*').eq('group_name', 'PRODUCTION_WORKFLOW').order('key', { ascending: true });
       if (updatedList) setTasks(updatedList);
     } catch (e: any) { showToast('Lỗi', e.message, 'error'); }
@@ -205,12 +220,17 @@ export default function AdminTaskWorkflowDashboard() {
           <ClipboardList className="w-5 h-5 text-purple-500" />
           <div>
             <h1 className="text-base font-bold">Hệ Thống Gom Nhóm & Quản Lý Dự Án Tập Tập Trung</h1>
-            <p className="text-[11px] text-slate-400 mt-0.5">Giao diện rút gọn ma trận tối ưu dung lượng hiển thị</p>
+            <p className="text-[11px] text-slate-400 mt-0.5">Giao diện điều khiển Admin - Tính toán % theo tiến độ Giai đoạn (Phase)</p>
           </div>
         </div>
-        <button onClick={handleOpenAddModal} className="bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl flex items-center gap-1.5 transition shadow-lg">
-          <Plus className="w-4 h-4" /> Tạo dự án mới
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={handleManualRefresh} className="bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-300 p-2.5 rounded-xl transition flex items-center gap-1.5 text-xs font-bold">
+            <RefreshCcw className="w-4 h-4" /> Làm mới
+          </button>
+          <button onClick={handleOpenAddModal} className="bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl flex items-center gap-1.5 transition shadow-lg">
+            <Plus className="w-4 h-4" /> Tạo dự án mới
+          </button>
+        </div>
       </div>
 
       {/* 📊 BOX TÍNH TỔNG */}
@@ -264,8 +284,10 @@ export default function AdminTaskWorkflowDashboard() {
               {currentProjectNames.map(pName => {
                 const projectPhases = projectGroupsMap[pName].sort((a, b) => a.key.localeCompare(b.key));
                 const totalPhases = projectPhases.length;
+                
+                // 🔥 THEO Ý SẾP: Admin hiển thị % dự án tính dựa theo các Phase lớn đã báo DONE
                 const donePhases = projectPhases.filter(ph => ph.value === 'DONE').length;
-                const pct = Math.round((donePhases / totalPhases) * 100) || 0;
+                const pct = totalPhases > 0 ? Math.round((donePhases / totalPhases) * 100) : 0;
                 
                 let deadline = 'Chưa đặt';
                 let driveLink = '';
@@ -442,7 +464,7 @@ export default function AdminTaskWorkflowDashboard() {
                         <button type="button" onClick={() => handleRemoveTaskInForm(pIdx, tIdx)} className="text-slate-500 hover:text-red-400"><Trash2 className="w-4 h-4"/></button>
                       </div>
                     ))}
-                    <button type="button" onClick={() => handleAddTaskInForm(pIdx)} className="text-[10px] text-purple-400 font-bold hover:underline">+ Thêm việc con</button>
+                    <button type="button" onClick={handleAddTaskInForm(pIdx)} className="text-[10px] text-purple-400 font-bold hover:underline">+ Thêm việc con</button>
                   </div>
                 </div>
               ))}

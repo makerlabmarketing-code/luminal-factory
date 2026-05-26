@@ -26,17 +26,6 @@ export default function GatewayPage() {
               <p className="text-xs text-slate-500">Quản lý lương, góp vốn, quy trình xưởng</p>
             </div>
           </Link>
-
-          {/* 🔥 ĐÃ VÁ LỖI NOTFOUND: Điều hướng trực tiếp thợ về Portal trung tâm */}
-          <Link href="/staff/portal" className="group p-6 bg-slate-900 border border-slate-800 rounded-2xl hover:border-amber-500/50 transition flex items-center gap-4 text-left shadow-xl">
-            <div className="p-3 bg-amber-600/10 text-amber-500 rounded-xl group-hover:bg-amber-600 group-hover:text-white transition">
-              <Users className="w-6 h-6" />
-            </div>
-            <div>
-              <h3 className="font-bold text-white">Dành cho Nhân sự</h3>
-              <p className="text-xs text-slate-500">Chấm công, làm checklist, nhận việc ca máy</p>
-            </div>
-          </Link>
         </div>
 
         <p className="text-[10px] text-slate-600 font-bold uppercase tracking-widest">Version 1.0.0 Realtime - Secured by Supabase</p>
