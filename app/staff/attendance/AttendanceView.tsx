@@ -24,7 +24,6 @@ export function StaffAttendanceContent({ token: propsToken, workerData }: any) {
       const { data: check } = await supabase.from('attendance').select('*').eq('employee_id', currentWorker.id).eq('work_date', todayStr).maybeSingle();
       setIsInShift(!!(check && check.check_in && !check.check_out));
     } catch (e) { console.error(e); }
-    // 🔥 ĐÃ VÁ LỖI: Đổi từ setLoading thành setFetching để Next.js thông qua vòng build hỏa tốc
     setFetching(false); 
   };
 
@@ -32,7 +31,8 @@ export function StaffAttendanceContent({ token: propsToken, workerData }: any) {
     const timer = setInterval(() => setLiveTime(new Date()), 1000);
     
     const initialize = async () => {
-      let finalWorker = null;
+      // 🔥 ĐÃ VÁ LỖI: Thêm định nghĩa kiểu dữ liệu ': any' để Next.js thông qua vòng build đóng gói
+      let finalWorker: any = null;
 
       // Kéo dữ liệu nhân sự tươi từ DB về để chống bộ nhớ đệm cache cũ
       if (workerData?.id) {
