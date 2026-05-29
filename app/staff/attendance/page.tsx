@@ -110,12 +110,12 @@ export default function StaffAttendancePage() {
       </div>
 
       <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl space-y-2">
-        <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1"><MapPin className="w-3.5 h-3.5 text-purple-500" /> Cơ sở trực ban được giao (Khóa cứng):</label>
+        <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1"><MapPin className="w-3.5 h-3.5 text-purple-500" /> Cơ sở trực ban:</label>
         <div className="w-full bg-slate-950 border border-slate-850 p-3.5 rounded-xl font-sans text-xs text-slate-200 font-black tracking-wide border-l-4 border-l-purple-500 shadow-inner">
           🏛️ {assignedBranch ? assignedBranch.name : 'Đang bóc tách định vị...'}
         </div>
         <div className="text-[9px] text-slate-500 font-mono mt-2 text-center bg-slate-950 p-2 rounded-lg border border-slate-850">
-          Hệ thống nhận ca thông minh: <span className="text-purple-400 font-bold uppercase">{autoDetectShift(liveTime)}</span>
+          Hệ thống nhận ca: <span className="text-purple-400 font-bold uppercase">{autoDetectShift(liveTime)}</span>
         </div>
       </div>
 
