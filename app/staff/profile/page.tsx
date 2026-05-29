@@ -1,38 +1,67 @@
 // app/staff/profile/page.tsx
 'use client';
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { useNotification } from '@/component/NotificationContext';
-import { Briefcase, RefreshCcw } from 'lucide-react';
+import { Briefcase, RefreshCcw, ShieldCheck, MapPin, Award, Banknote } from 'lucide-react';
 
-export default function StaffProfilePage() {
+interface ProfileProps {
+  token?: string | null;
+  workerData?: any;
+}
+
+export default function StaffProfilePage({ token: propsToken, workerData }: ProfileProps) {
   const { showToast } = useNotification();
-  const [worker, setWorker] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const searchParams = useSearchParams();
+  
+  // Ưu tiên lấy token từ props Portal, nếu không có mới bóc từ URL đường dẫn lẻ
+  const token = propsToken || searchParams.get('token');
+
+  const [worker, setWorker] = useState<any>(workerData || null);
+  const [loading, setLoading] = useState(!workerData);
 
   const [profilePhone, setProfilePhone] = useState('');
   const [profileBankName, setProfileBankName] = useState('');
   const [profileBankAcc, setProfileBankAcc] = useState('');
 
-  useEffect(() => {
-    const loadProfile = async () => {
-      try {
-        const { data: emp } = await supabase.from('employees').select('*').eq('status', 'ACTIVE').order('id', { ascending: true }).limit(1).maybeSingle();
+  // 💵 BẢNG ĐỐI SOÁT ĐƠN GIÁ CÔNG CA ĐƯỢC HIỂN THỊ ĐỂ THỢ THEO DÕI
+  const GET_SHIFT_WAGE_BY_TITLE = (title: string) => {
+    const formattedTitle = (title || '').trim().toUpperCase();
+    if (formattedTitle === 'A1') return 150000; 
+    return 100000; 
+  };
+
+  const loadProfileData = async () => {
+    if (!token) return;
+    try {
+      let currentWorker = worker;
+      // Nếu Portal chưa truyền kịp workerData sang, chạy định danh hỏa tốc theo token URL
+      if (!currentWorker) {
+        const { data: emp } = await supabase.from('employees').select('*').eq('qr_token', token).maybeSingle();
         if (emp) {
           setWorker(emp);
-          setProfilePhone(emp.phone || '');
-          setProfileBankName(emp.bank_name || '');
-          setProfileBankAcc(emp.bank_account_number || '');
+          currentWorker = emp;
         }
-      } catch (e) {
-        console.error(e);
       }
-      setLoading(false);
-    };
-    loadProfile();
-  }, []);
+
+      if (currentWorker) {
+        setProfilePhone(currentWorker.phone || '');
+        setProfileBankName(currentWorker.bank_name || '');
+        setProfileBankAcc(currentWorker.bank_account_number || '');
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => { 
+    loadProfileData(); 
+  }, [token, workerData]);
 
   const handleSaveProfile = async () => {
+    if (!worker) return;
     try {
       const { error } = await supabase.from('employees').update({
         phone: profilePhone.trim(),
@@ -47,31 +76,90 @@ export default function StaffProfilePage() {
     }
   };
 
-  if (loading) return <div className="p-12 text-center text-xs font-mono text-slate-500 bg-slate-950 min-h-screen flex items-center justify-center gap-2"><RefreshCcw className="w-4 h-4 animate-spin" />Đang kiểm tra hồ sơ...</div>;
-  if (!worker) return null;
+  if (loading) return <div className="text-center p-6 text-xs text-slate-500 font-mono"><RefreshCcw className="w-4 h-4 animate-spin text-blue-500 mx-auto mb-2"/> Đang kiểm tra hồ sơ số hóa...</div>;
+  if (!worker) return <div className="text-center p-6 text-xs text-slate-500 italic font-mono">Không tìm thấy thông tin nhân sự hợp lệ.</div>;
+
+  const currentWage = GET_SHIFT_WAGE_BY_TITLE(worker.title);
 
   return (
-    <div className="p-4 max-w-2xl mx-auto bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-5 text-xs mt-4">
+    <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 md:p-6 shadow-xl space-y-5 text-xs max-w-2xl mx-auto animate-fadeIn">
+      
       <div className="flex items-center gap-2 border-b border-slate-800 pb-3">
         <Briefcase className="w-4 h-4 text-blue-400" />
         <h2 className="font-bold text-slate-200 uppercase tracking-wider text-[11px]">Hồ Sơ Thành Viên Số Hóa</h2>
       </div>
-      
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div><label className="text-slate-400 font-bold">Số điện thoại liên lạc liên hệ:</label><input type="text" className="w-full bg-slate-950 border border-slate-800 p-3 mt-1.5 rounded-xl focus:outline-none text-slate-200 font-medium" value={profilePhone} onChange={e => setProfilePhone(e.target.value)} /></div>
-        <div><label className="text-slate-400 font-bold">Tên Ngân hàng thụ hưởng lương ca:</label><input type="text" className="w-full bg-slate-950 border border-slate-800 p-3 mt-1.5 rounded-xl focus:outline-none text-slate-200 font-medium" value={profileBankName} onChange={e => setProfileBankName(e.target.value)} /></div>
-        <div className="sm:col-span-2"><label className="text-slate-400 font-bold">Số tài khoản nhận tiền lương quỹ:</label><input type="text" className="w-full bg-slate-950 border border-slate-800 p-3 mt-1.5 rounded-xl focus:outline-none text-amber-400 font-bold font-mono text-sm tracking-wider" value={profileBankAcc} onChange={e => setProfileBankAcc(e.target.value)} /></div>
+
+      {/* 🔒 KHỐI THÔNG TIN VỊ TRÍ & MỨC LƯƠNG (READ-ONLY) */}
+      <div className="bg-slate-950 border border-slate-850 p-4 rounded-2xl grid grid-cols-1 sm:grid-cols-3 gap-4 text-[11px] font-sans">
+        <div className="space-y-1">
+          <span className="text-slate-500 font-bold uppercase block text-[9px] tracking-wide flex items-center gap-1">
+            <MapPin className="w-3 h-3 text-purple-400" /> Vị trí làm việc:
+          </span>
+          <input 
+            type="text" 
+            readOnly 
+            className="w-full bg-slate-900/60 border border-slate-800/60 p-2.5 rounded-xl text-slate-400 font-black cursor-not-allowed focus:outline-none" 
+            value={worker.branch || 'Chưa phân phối'} 
+          />
+        </div>
+        <div className="space-y-1">
+          <span className="text-slate-500 font-bold uppercase block text-[9px] tracking-wide flex items-center gap-1">
+            <Award className="w-3 h-3 text-blue-400" /> Chức vụ (Title):
+          </span>
+          <input 
+            type="text" 
+            readOnly 
+            className="w-full bg-slate-900/60 border border-slate-800/60 p-2.5 rounded-xl text-blue-400 font-black tracking-wider cursor-not-allowed focus:outline-none" 
+            value={`${worker.title || 'KTV'} • Cấp ${worker.level || 'M1'}`} 
+          />
+        </div>
+        <div className="space-y-1">
+          <span className="text-slate-500 font-bold uppercase block text-[9px] tracking-wide flex items-center gap-1">
+            <Banknote className="w-3 h-3 text-emerald-400" /> Đơn giá công ca:
+          </span>
+          <input 
+            type="text" 
+            readOnly 
+            className="w-full bg-slate-900/60 border border-slate-800/60 p-2.5 rounded-xl text-emerald-400 font-bold font-mono cursor-not-allowed focus:outline-none" 
+            value={`${currentWage.toLocaleString('vi-VN')} đ / ca`} 
+          />
+        </div>
       </div>
-      <button onClick={handleSaveProfile} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black p-3.5 rounded-xl transition shadow-lg uppercase text-[11px] tracking-wide">Cập nhật tài khoản lương thụ hưởng</button>
       
-      <div className="pt-4 border-t border-slate-800 mt-3">
+      {/* ✏️ KHỐI THÔNG TIN CÓ THỂ CHỈNH SỬA VÀ CẬP NHẬT */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+        <div className="space-y-1.5">
+          <label className="text-slate-400 font-bold block pl-0.5">Số điện thoại liên lạc liên hệ:</label>
+          <input type="text" className="w-full bg-slate-950 border border-slate-800 p-3 rounded-xl focus:outline-none text-slate-200 font-medium font-mono" value={profilePhone} onChange={e => setProfilePhone(e.target.value)} />
+        </div>
+        <div className="space-y-1.5">
+          <label className="text-slate-400 font-bold block pl-0.5">Tên Ngân hàng thụ hưởng lương ca:</label>
+          <input type="text" className="w-full bg-slate-950 border border-slate-800 p-3 rounded-xl focus:outline-none text-slate-200 font-medium" value={profileBankName} onChange={e => setProfileBankName(e.target.value)} />
+        </div>
+        <div className="sm:col-span-2 space-y-1.5">
+          <label className="text-slate-400 font-bold block pl-0.5">Số tài khoản nhận tiền lương quỹ:</label>
+          <input type="text" className="w-full bg-slate-950 border border-slate-800 p-3 rounded-xl focus:outline-none text-amber-400 font-bold font-mono text-sm tracking-wider" value={profileBankAcc} onChange={e => setProfileBankAcc(e.target.value)} />
+        </div>
+      </div>
+
+      <button onClick={handleSaveProfile} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black p-3.5 rounded-xl transition shadow-lg uppercase text-[10px] tracking-widest flex items-center justify-center gap-1 cursor-pointer">
+        <ShieldCheck className="w-4 h-4" /> Cập nhật tài khoản lương thụ hưởng
+      </button>
+      
+      {/* KHỐI FILE SCAN HỢP ĐỒNG */}
+      <div className="pt-4 border-t border-slate-800 mt-2">
         <label className="text-slate-500 block mb-2 font-bold uppercase text-[9px] tracking-wider font-mono">Bản sao hợp đồng lao động số hóa xem link từ bên quản lý nhân sự:</label>
         {worker.drive_contract ? (
-          <a href={worker.drive_contract} target="_blank" rel="noreferrer" className="block w-full bg-slate-950 border border-slate-700 hover:border-blue-500 text-blue-400 font-bold p-3 rounded-xl text-center transition hover:bg-slate-900 font-mono text-xs">📥 MỞ XEM BẢN SCAN PDF HỢP ĐỒNG LAO ĐỘNG</a>
+          <a href={worker.drive_contract} target="_blank" rel="noreferrer" className="block w-full bg-slate-950 border border-slate-700 hover:border-blue-500 text-blue-400 font-bold p-3 rounded-xl text-center transition hover:bg-slate-900 font-mono text-xs shadow-inner">
+            📥 MỞ XEM BẢN SCAN PDF HỢP ĐỒNG LAO ĐỘNG
+          </a>
         ) : (
-          <div className="w-full bg-slate-950/40 border border-slate-800 border-dashed p-3 rounded-xl text-slate-600 text-center italic font-mono">Hệ thống quản lý hành chính chưa cập nhật tệp hợp đồng lao động của sếp lên Cloud.</div>
+          <div className="w-full bg-slate-950/40 border border-slate-800 border-dashed p-3 rounded-xl text-slate-600 text-center italic font-mono">
+            Hệ thống quản lý hành chính chưa cập nhật tệp hợp đồng lao động của sếp lên Cloud.
+          </div>
         )}
       </div>
+
     </div>
   );
 }
