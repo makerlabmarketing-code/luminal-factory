@@ -24,7 +24,8 @@ export function StaffAttendanceContent({ token: propsToken, workerData }: any) {
       const { data: check } = await supabase.from('attendance').select('*').eq('employee_id', currentWorker.id).eq('work_date', todayStr).maybeSingle();
       setIsInShift(!!(check && check.check_in && !check.check_out));
     } catch (e) { console.error(e); }
-    setLoading(false);
+    // 🔥 ĐÃ VÁ LỖI: Đổi từ setLoading thành setFetching để Next.js thông qua vòng build hỏa tốc
+    setFetching(false); 
   };
 
   useEffect(() => {
@@ -33,7 +34,7 @@ export function StaffAttendanceContent({ token: propsToken, workerData }: any) {
     const initialize = async () => {
       let finalWorker = null;
 
-      // 1. Kéo dữ liệu nhân sự tươi từ DB về để chống bộ nhớ đệm cache cũ
+      // Kéo dữ liệu nhân sự tươi từ DB về để chống bộ nhớ đệm cache cũ
       if (workerData?.id) {
         setFetching(true);
         const { data: freshEmp } = await supabase.from('employees').select('*').eq('id', workerData.id).maybeSingle();
@@ -46,19 +47,17 @@ export function StaffAttendanceContent({ token: propsToken, workerData }: any) {
       if (finalWorker) {
         setWorker(finalWorker);
         
-        // 2. 🔥 THUẬT TOÁN QUÉT CHI NHÁNH ĐỘNG: Chấp mọi tên trường gán trong DB (branch, branch_code, workplace...)
+        // Thuật toán quét chi nhánh động thông minh chấp mọi tên trường gán trong DB
         try {
           const { data: metaBranch } = await supabase.from('system_metadata').select('data').eq('name', 'Danh sách Chi nhánh').maybeSingle();
           const branchData = metaBranch?.data || [];
           
-          // Quét xuyên suốt các thuộc tính của nhân sự xem trường nào chứa giá trị khớp với chi nhánh hệ thống
           const matchedBranch = branchData.find((b: any) => 
             Object.values(finalWorker).some(val => 
               typeof val === 'string' && (val.toLowerCase() === b.code.toLowerCase() || val.toLowerCase() === b.name.toLowerCase())
             )
           );
           
-          // Hiển thị chuẩn xác tên chi nhánh tìm được, nếu không khớp cơ sở nào mới hiện Chưa gán
           setLocalBranchName(matchedBranch ? matchedBranch.name : 'Chưa gán cơ sở');
         } catch (err) {
           setLocalBranchName('Lỗi đồng bộ chi nhánh');
@@ -94,22 +93,18 @@ export function StaffAttendanceContent({ token: propsToken, workerData }: any) {
     if (!navigator.geolocation) return showToast('Lỗi thiết bị', 'Thiết bị không hỗ trợ định vị GPS!', 'error');
 
     try {
-      // 1. Truy vấn nóng danh sách chi nhánh từ metadata hệ thống
       const { data: metaBranch } = await supabase.from('system_metadata').select('data').eq('name', 'Danh sách Chi nhánh').maybeSingle();
       const branchData = metaBranch?.data || [];
       
-      // 2. Kéo profile tươi mới nhất để cập nhật ranh giới rào chắn đề phòng Admin vừa bấm đổi cơ sở
       const { data: freshEmp } = await supabase.from('employees').select('*').eq('id', worker.id).maybeSingle();
       const activeWorker = freshEmp || worker;
 
-      // 3. 🔥 ÁP DỤNG THUẬT TOÁN ĐỊNH VỊ CHI NHÁNH ĐỘNG KHI CLICK CHẤM CÔNG
       const matchedBranch = branchData.find((b: any) => 
         Object.values(activeWorker).some(val => 
           typeof val === 'string' && (val.toLowerCase() === b.code.toLowerCase() || val.toLowerCase() === b.name.toLowerCase())
         )
       );
 
-      // Cập nhật text hiển thị ngay trên UI
       setLocalBranchName(matchedBranch ? matchedBranch.name : 'Chưa gán cơ sở');
 
       if (!matchedBranch) return showToast('Lỗi địa điểm', 'Cơ sở được giao của bạn chưa được cấu hình tọa độ rào ranh giới GPS!', 'error');
@@ -118,7 +113,6 @@ export function StaffAttendanceContent({ token: propsToken, workerData }: any) {
         const uLat = position.coords.latitude;
         const uLng = position.coords.longitude;
         
-        // Tính khoảng cách thời gian thực chuẩn mét tới tọa độ chi nhánh đã được quét động
         const distance = calculateDistance(uLat, uLng, matchedBranch.lat, matchedBranch.lng);
 
         if (distance > matchedBranch.radius) {
@@ -140,7 +134,7 @@ export function StaffAttendanceContent({ token: propsToken, workerData }: any) {
       }, () => { 
         showToast('Quyền định vị', 'Vui lòng mở quyền truy cập vị trí GPS mức chính xác cao trên trình duyệt điện thoại!', 'error'); 
       }, { 
-        enableHighAccuracy: true, // Ép chip điện thoại bật định vị mức nhạy và chuẩn xác nhất
+        enableHighAccuracy: true, 
         timeout: 5000 
       });
 
