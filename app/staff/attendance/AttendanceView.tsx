@@ -17,7 +17,7 @@ export function StaffAttendanceContent({ token: propsToken, workerData }: any) {
   const [liveTime, setLiveTime] = useState(new Date());
   const [fetching, setFetching] = useState(true);
 
-  // Hàm quét trạng thái ca kíp hỏa tốc ngày hôm nay
+  // Hàm quét trạng thái ca kíp ngày hôm nay
   const loadInitialShiftStatus = async (currentWorker: any) => {
     try {
       const todayStr = new Date().toLocaleDateString('en-CA');
@@ -27,14 +27,40 @@ export function StaffAttendanceContent({ token: propsToken, workerData }: any) {
     setFetching(false); 
   };
 
+  // Hàm helper đối sánh chi nhánh an toàn, tránh trùng lặp từ khóa "test" của tài khoản
+  const findMatchedBranch = (workerObj: any, branchList: any[]) => {
+    return branchList.find((b: any) => {
+      const branchCodeLower = b.code?.toLowerCase();
+      const branchNameLower = b.name?.toLowerCase();
+
+      // 1. Ưu tiên kiểm tra các trường chỉ định chi nhánh trực tiếp trong cấu hình cấu trúc dữ liệu
+      if (workerObj.branch_code?.toLowerCase() === branchCodeLower) return true;
+      if (workerObj.branch?.toLowerCase() === branchCodeLower) return true;
+      if (workerObj.facility_code?.toLowerCase() === branchCodeLower) return true;
+
+      // 2. Vòng lặp dự phòng an toàn: Bỏ qua các trường thông tin cá nhân nhạy cảm dễ gây nhiễu dữ liệu test
+      return Object.entries(workerObj).some(([key, val]) => {
+        if (typeof val !== 'string') return false;
+        const valLower = val.toLowerCase();
+        
+        // Nếu là trường định danh cá nhân, chỉ cho phép khớp với mã chi nhánh định sẵn (ví dụ: CN1, CN2)
+        if (['full_name', 'username', 'email', 'id', 'qr_token'].includes(key)) {
+          return valLower === branchCodeLower;
+        }
+        
+        return valLower === branchCodeLower || valLower === branchNameLower;
+      });
+    });
+  };
+
   useEffect(() => {
     const timer = setInterval(() => setLiveTime(new Date()), 1000);
     
     const initialize = async () => {
-      // 🔥 ĐÃ VÁ LỖI: Thêm định nghĩa kiểu dữ liệu ': any' để Next.js thông qua vòng build đóng gói
+      // Định nghĩa kiểu dữ liệu tường minh tránh lỗi build Next.js
       let finalWorker: any = null;
 
-      // Kéo dữ liệu nhân sự tươi từ DB về để chống bộ nhớ đệm cache cũ
+      // Kéo dữ liệu nhân sự mới nhất từ DB về để tránh bộ nhớ đệm cache cũ
       if (workerData?.id) {
         setFetching(true);
         const { data: freshEmp } = await supabase.from('employees').select('*').eq('id', workerData.id).maybeSingle();
@@ -47,17 +73,12 @@ export function StaffAttendanceContent({ token: propsToken, workerData }: any) {
       if (finalWorker) {
         setWorker(finalWorker);
         
-        // Thuật toán quét chi nhánh động thông minh chấp mọi tên trường gán trong DB
+        // Tiến hành đối sánh định vị chi nhánh làm việc
         try {
           const { data: metaBranch } = await supabase.from('system_metadata').select('data').eq('name', 'Danh sách Chi nhánh').maybeSingle();
           const branchData = metaBranch?.data || [];
           
-          const matchedBranch = branchData.find((b: any) => 
-            Object.values(finalWorker).some(val => 
-              typeof val === 'string' && (val.toLowerCase() === b.code.toLowerCase() || val.toLowerCase() === b.name.toLowerCase())
-            )
-          );
-          
+          const matchedBranch = findMatchedBranch(finalWorker, branchData);
           setLocalBranchName(matchedBranch ? matchedBranch.name : 'Chưa gán cơ sở');
         } catch (err) {
           setLocalBranchName('Lỗi đồng bộ chi nhánh');
@@ -99,12 +120,7 @@ export function StaffAttendanceContent({ token: propsToken, workerData }: any) {
       const { data: freshEmp } = await supabase.from('employees').select('*').eq('id', worker.id).maybeSingle();
       const activeWorker = freshEmp || worker;
 
-      const matchedBranch = branchData.find((b: any) => 
-        Object.values(activeWorker).some(val => 
-          typeof val === 'string' && (val.toLowerCase() === b.code.toLowerCase() || val.toLowerCase() === b.name.toLowerCase())
-        )
-      );
-
+      const matchedBranch = findMatchedBranch(activeWorker, branchData);
       setLocalBranchName(matchedBranch ? matchedBranch.name : 'Chưa gán cơ sở');
 
       if (!matchedBranch) return showToast('Lỗi địa điểm', 'Cơ sở được giao của bạn chưa được cấu hình tọa độ rào ranh giới GPS!', 'error');

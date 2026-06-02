@@ -3,12 +3,14 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useNotification } from '@/component/NotificationContext';
-import { MapPin, Plus, Trash2, Edit2, X, RefreshCcw, Navigation } from 'lucide-react';
+import { fetchCoordinatesFromAddress } from '@/ultis/geocoding'; // Đường dẫn import đồng bộ chính xác
+import { MapPin, Plus, Trash2, Edit2, X, RefreshCcw, Navigation, Loader2 } from 'lucide-react';
 
 export default function AdminFacilitiesManagement() {
   const { showToast, showConfirm } = useNotification();
   const [branches, setBranches] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isGeocoding, setIsGeocoding] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
 
@@ -32,16 +34,23 @@ export default function AdminFacilitiesManagement() {
 
   useEffect(() => { loadFacilities(); }, []);
 
-  const handleGeocode = () => {
+  const handleGeocode = async () => {
     if (!address.trim()) {
       showToast('Thiếu địa chỉ', 'Sếp cần gõ Địa chỉ thực tế xưởng trước khi dò tọa độ!', 'error');
       return;
     }
-    const mockLat = (20.9822 + Math.random() * 0.001).toFixed(6);
-    const mockLng = (105.8866 + Math.random() * 0.001).toFixed(6);
-    setLat(mockLat);
-    setLng(mockLng);
-    showToast('Dò tọa độ xong', 'Hệ thống đã tự động định vị mốc Vĩ độ và Kinh độ cho cơ sở!', 'success');
+
+    setIsGeocoding(true);
+    const result = await fetchCoordinatesFromAddress(address);
+    setIsGeocoding(false);
+
+    if (result.success) {
+      setLat(result.lat);
+      setLng(result.lng);
+      showToast('Dò tọa độ xong', 'Hệ thống đã tự động định vị mốc Vĩ độ và Kinh độ cho cơ sở!', 'success');
+    } else {
+      showToast('Lỗi định vị', result.error || 'Không thể tìm thấy tọa độ từ địa chỉ này.', 'error');
+    }
   };
 
   const handleOpenAdd = () => {
@@ -50,7 +59,7 @@ export default function AdminFacilitiesManagement() {
   };
 
   const handleOpenEdit = (b: any) => {
-    setIsEditing(true); setCode(b.code); setName(b.name); setAddress(b.address || ''); setLat(b.lat.toString()); setLng(b.lng.toString()); setRadius(b.radius.toString());
+    setIsEditing(true); setCode(b.code); setName(b.name); setAddress(b.address || ''); setLat(b.lat?.toString() || ''); setLng(b.lng?.toString() || ''); setRadius(b.radius?.toString() || '20');
     setShowModal(true);
   };
 
@@ -81,7 +90,7 @@ export default function AdminFacilitiesManagement() {
       if (error) throw error;
 
       setShowModal(false); 
-      await loadFacilities(); // Chờ nạp lại data
+      await loadFacilities();
       showToast('Thành công', isEditing ? 'Đã cập nhật dữ liệu cơ sở thành công!' : '✨ Đã thêm mới cơ sở chi nhánh vào rào chắn GPS Geofencing thành công!', 'success');
     } catch (err: any) {
       showToast('Lỗi đám mây', err.message, 'error');
@@ -152,7 +161,15 @@ export default function AdminFacilitiesManagement() {
                 <label className="text-slate-400 font-medium">Địa chỉ thực tế xưởng:</label>
                 <div className="flex gap-2 mt-1.5">
                   <input type="text" placeholder="Gõ đủ số nhà, tên đường, thành phố..." className="flex-1 bg-slate-950 border border-slate-800 rounded-xl p-3 focus:outline-none text-slate-200" value={address} onChange={e => setAddress(e.target.value)} />
-                  <button type="button" onClick={handleGeocode} className="bg-slate-950 border border-slate-850 text-cyan-400 font-bold px-3 py-2 rounded-xl flex items-center gap-1 hover:border-cyan-500/40 transition shrink-0"><Navigation className="w-3.5 h-3.5"/> Dò Tọa Độ</button>
+                  <button 
+                    type="button" 
+                    onClick={handleGeocode} 
+                    disabled={isGeocoding}
+                    className="bg-slate-950 border border-slate-850 text-cyan-400 font-bold px-3 py-2 rounded-xl flex items-center gap-1 hover:border-cyan-500/40 transition shrink-0 disabled:opacity-50"
+                  >
+                    {isGeocoding ? <Loader2 className="w-3.5 h-3.5 animate-spin"/> : <Navigation className="w-3.5 h-3.5"/>}
+                    {isGeocoding ? 'Đang dò...' : 'Dò Tọa Độ'}
+                  </button>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3 pt-1">
