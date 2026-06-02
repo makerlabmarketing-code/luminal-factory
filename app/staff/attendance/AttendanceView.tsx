@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation'; 
 import { supabase } from '@/lib/supabase';
 import { useNotification } from '@/component/NotificationContext';
-import { Power, MapPin, RefreshCcw } from 'lucide-react';
+import { Power, MapPin, RefreshCcw, AlertTriangle } from 'lucide-react';
 
 export function StaffAttendanceContent({ token: propsToken, workerData }: any) {
   const { showToast } = useNotification();
@@ -23,8 +23,11 @@ export function StaffAttendanceContent({ token: propsToken, workerData }: any) {
       const todayStr = new Date().toLocaleDateString('en-CA');
       const { data: check } = await supabase.from('attendance').select('*').eq('employee_id', currentWorker.id).eq('work_date', todayStr).maybeSingle();
       setIsInShift(!!(check && check.check_in && !check.check_out));
-    } catch (e) { console.error(e); }
-    setFetching(false); 
+    } catch (e) { 
+      console.error(e); 
+    } finally {
+      setFetching(false); 
+    }
   };
 
   // Hàm helper đối sánh chi nhánh an toàn, tránh trùng lặp từ khóa "test" của tài khoản
@@ -33,17 +36,14 @@ export function StaffAttendanceContent({ token: propsToken, workerData }: any) {
       const branchCodeLower = b.code?.toLowerCase();
       const branchNameLower = b.name?.toLowerCase();
 
-      // 1. Ưu tiên kiểm tra các trường chỉ định chi nhánh trực tiếp trong cấu hình cấu trúc dữ liệu
       if (workerObj.branch_code?.toLowerCase() === branchCodeLower) return true;
       if (workerObj.branch?.toLowerCase() === branchCodeLower) return true;
       if (workerObj.facility_code?.toLowerCase() === branchCodeLower) return true;
 
-      // 2. Vòng lặp dự phòng an toàn: Bỏ qua các trường thông tin cá nhân nhạy cảm dễ gây nhiễu dữ liệu test
       return Object.entries(workerObj).some(([key, val]) => {
         if (typeof val !== 'string') return false;
         const valLower = val.toLowerCase();
         
-        // Nếu là trường định danh cá nhân, chỉ cho phép khớp với mã chi nhánh định sẵn (ví dụ: CN1, CN2)
         if (['full_name', 'username', 'email', 'id', 'qr_token'].includes(key)) {
           return valLower === branchCodeLower;
         }
@@ -57,35 +57,39 @@ export function StaffAttendanceContent({ token: propsToken, workerData }: any) {
     const timer = setInterval(() => setLiveTime(new Date()), 1000);
     
     const initialize = async () => {
-      // Định nghĩa kiểu dữ liệu tường minh tránh lỗi build Next.js
+      setFetching(true); // Reset trạng thái loading khi bắt đầu đồng bộ dữ liệu
       let finalWorker: any = null;
 
-      // Kéo dữ liệu nhân sự mới nhất từ DB về để tránh bộ nhớ đệm cache cũ
-      if (workerData?.id) {
-        setFetching(true);
-        const { data: freshEmp } = await supabase.from('employees').select('*').eq('id', workerData.id).maybeSingle();
-        finalWorker = freshEmp || workerData; 
-      } else if (token) {
-        const { data: emp } = await supabase.from('employees').select('*').eq('qr_token', token).maybeSingle();
-        finalWorker = emp;
-      }
-
-      if (finalWorker) {
-        setWorker(finalWorker);
-        
-        // Tiến hành đối sánh định vị chi nhánh làm việc
-        try {
-          const { data: metaBranch } = await supabase.from('system_metadata').select('data').eq('name', 'Danh sách Chi nhánh').maybeSingle();
-          const branchData = metaBranch?.data || [];
-          
-          const matchedBranch = findMatchedBranch(finalWorker, branchData);
-          setLocalBranchName(matchedBranch ? matchedBranch.name : 'Chưa gán cơ sở');
-        } catch (err) {
-          setLocalBranchName('Lỗi đồng bộ chi nhánh');
+      try {
+        // Kéo dữ liệu nhân sự tươi từ DB về để tránh bộ nhớ đệm cache cũ
+        if (workerData?.id) {
+          const { data: freshEmp } = await supabase.from('employees').select('*').eq('id', workerData.id).maybeSingle();
+          finalWorker = freshEmp || workerData; 
+        } else if (token) {
+          const { data: emp } = await supabase.from('employees').select('*').eq('qr_token', token).maybeSingle();
+          finalWorker = emp;
         }
 
-        await loadInitialShiftStatus(finalWorker);
-      } else {
+        if (finalWorker) {
+          setWorker(finalWorker);
+          
+          // Tiến hành đối sánh định vị chi nhánh làm việc
+          try {
+            const { data: metaBranch } = await supabase.from('system_metadata').select('data').eq('name', 'Danh sách Chi nhánh').maybeSingle();
+            const branchData = metaBranch?.data || [];
+            
+            const matchedBranch = findMatchedBranch(finalWorker, branchData);
+            setLocalBranchName(matchedBranch ? matchedBranch.name : 'Chưa gán cơ sở');
+          } catch (err) {
+            setLocalBranchName('Lỗi đồng bộ chi nhánh');
+          }
+
+          await loadInitialShiftStatus(finalWorker);
+        } else {
+          setFetching(false);
+        }
+      } catch (err) {
+        console.error(err);
         setFetching(false);
       }
     };
@@ -159,8 +163,28 @@ export function StaffAttendanceContent({ token: propsToken, workerData }: any) {
     }
   };
 
-  if (fetching || !worker) return <div className="text-center p-12 text-xs text-slate-500 font-mono"><RefreshCcw className="w-4 h-4 animate-spin text-blue-500 mx-auto mb-2"/> Đang đồng bộ trạm định vị Realtime hỏa tốc...</div>;
+  // 1. Trạng thái đang tải dữ liệu từ DB về
+  if (fetching) {
+    return (
+      <div className="text-center p-12 text-xs text-slate-500 font-mono">
+        <RefreshCcw className="w-4 h-4 animate-spin text-blue-500 mx-auto mb-2"/> 
+        Đang đồng bộ trạm định vị Realtime...
+      </div>
+    );
+  }
 
+  // 2. Trạng thái lỗi không quét được tài khoản nhân sự phù hợp
+  if (!worker) {
+    return (
+      <div className="flex flex-col items-center justify-center p-10 bg-slate-900 border border-slate-800 rounded-3xl space-y-3 shadow-xl max-w-md mx-auto mt-6 text-center text-xs text-slate-300 w-full animate-fadeIn">
+        <AlertTriangle className="w-8 h-8 text-amber-500 animate-pulse" />
+        <p className="font-bold">Không tìm thấy hồ sơ nhân sự</p>
+        <p className="text-[11px] text-slate-400">Đường dẫn Token không hợp lệ hoặc tài khoản của sếp chưa được đồng bộ trên hệ thống ERP.</p>
+      </div>
+    );
+  }
+
+  // 3. Màn hình giao diện chấm công chuẩn khi đã có đủ data
   return (
     <div className="flex flex-col items-center justify-center p-10 bg-slate-900 border border-slate-800 rounded-3xl space-y-5 shadow-xl max-w-md mx-auto mt-6 animate-fadeIn w-full">
       <div className="text-center space-y-1">
