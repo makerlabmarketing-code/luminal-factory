@@ -4,12 +4,11 @@ import { useState, useEffect, useRef } from 'react';
 import { ChevronLeft, ChevronRight, CalendarDays, ChevronDown } from 'lucide-react';
 
 interface MonthPickerProps {
-  value: string; // Định dạng dữ liệu liên thông: YYYY-MM
+  value: string; // Định dạng kết nối dữ liệu: YYYY-MM
   onChange: (newValue: string) => void;
-  accent?: 'default' | 'purple'; // Phân biệt giao diện Quản lý quỹ (emerald) và Chấm công (purple)
+  accent?: 'default' | 'purple'; // Định hình màu sắc cho Sổ cái (emerald) hoặc Chấm công (purple)
 }
 
-// Danh mục hiển thị viết tắt chuẩn hóa theo dạng lưới chữ nhật gọn gàng
 const MONTH_LABELS = [
   'Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4', 
   'Tháng 5', 'Tháng 6', 'Tháng 7', 'Tháng 8', 
@@ -20,15 +19,13 @@ export default function MonthPicker({ value, onChange, accent = 'default' }: Mon
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const [viewMode, setViewMode] = useState<'MONTH' | 'YEAR'>('MONTH');
   
-  // Tách giá trị thời gian thực tế từ props
   const selectedYear = value ? parseInt(value.split('-')[0]) : new Date().getFullYear();
   const selectedMonth = value ? parseInt(value.split('-')[1]) : new Date().getMonth() + 1;
 
-  // State lưu năm điều hướng trung gian khi người dùng lật trang trong popup
   const [navYear, setNavYear] = useState<number>(selectedYear);
   const pickerContainerRef = useRef<HTMLDivElement>(null);
 
-  // Logic tự động đóng Popover khi người dùng click ra ngoài vùng chọn
+  // Tự động đóng Popover khi người dùng nhấp chuột ra ngoài vùng chọn
   useEffect(() => {
     const handleOutsideClick = (event: MouseEvent) => {
       if (pickerContainerRef.current && !pickerContainerRef.current.contains(event.target as Node)) {
@@ -41,14 +38,12 @@ export default function MonthPicker({ value, onChange, accent = 'default' }: Mon
     return () => document.removeEventListener('mousedown', handleOutsideClick);
   }, [isOpen]);
 
-  // Đồng bộ năm điều hướng khi giá trị thời gian tổng thay đổi
   useEffect(() => {
     if (value) {
       setNavYear(parseInt(value.split('-')[0]));
     }
   }, [value]);
 
-  // Thao tác nhanh: Lùi 1 tháng qua nút bấm mũi tên bên ngoài
   const handleStepPrev = () => {
     let y = selectedYear;
     let m = selectedMonth - 1;
@@ -59,7 +54,6 @@ export default function MonthPicker({ value, onChange, accent = 'default' }: Mon
     onChange(`${y}-${String(m).padStart(2, '0')}`);
   };
 
-  // Thao tác nhanh: Tiến 1 tháng qua nút bấm mũi tên bên ngoài
   const handleStepNext = () => {
     let y = selectedYear;
     let m = selectedMonth + 1;
@@ -70,37 +64,38 @@ export default function MonthPicker({ value, onChange, accent = 'default' }: Mon
     onChange(`${y}-${String(m).padStart(2, '0')}`);
   };
 
-  // Xử lý sự kiện click chọn tháng trên lưới
   const handleMonthClick = (monthIndex: number) => {
     const formattedMonth = String(monthIndex + 1).padStart(2, '0');
     onChange(`${navYear}-${formattedMonth}`);
-    setIsOpen(false); // Chọn xong tháng thì đóng popup luôn
+    setIsOpen(false);
   };
 
-  // Xử lý sự kiện click chọn năm trên lưới
   const handleYearClick = (year: number) => {
     setNavYear(year);
-    setViewMode('MONTH'); // Chọn năm xong tự động quay lại lưới chọn tháng
+    setViewMode('MONTH');
   };
 
-  // Tính toán lưới dải 12 năm hiển thị (Cố định khung hình chữ nhật 3x4)
   const startYearRange = Math.floor(navYear / 12) * 12;
   const yearsGridArray = Array.from({ length: 12 }, (_, i) => startYearRange + i);
 
-  // Cấu hình mã màu đồng bộ theo chuẩn thiết kế ERP của từng phân hệ
   const textColor = accent === 'purple' ? 'text-purple-400' : 'text-emerald-400';
   const bgColor = accent === 'purple' ? 'bg-purple-600' : 'bg-emerald-600';
   const hoverColor = accent === 'purple' ? 'hover:bg-purple-500/20 hover:text-purple-300' : 'hover:bg-emerald-500/20 hover:text-emerald-300';
   const borderTheme = accent === 'purple' ? 'border-purple-500/30' : 'border-emerald-500/30';
 
   return (
-    <div className="relative flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 select-none" ref={pickerContainerRef}>
-      {/* Nút bấm mũi tên lùi nhanh bên trái */}
-      <button onClick={() => handleStepPrev()} className="p-1.5 text-slate-400 hover:text-white transition rounded-lg hover:bg-slate-900">
+    /* Ép bắt buộc cấu hình relative cho container bọc ngoài cùng */
+    <div 
+      className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 select-none" 
+      ref={pickerContainerRef}
+      style={{ position: 'relative' }}
+    >
+      {/* Mũi tên điều hướng lùi */}
+      <button onClick={handleStepPrev} className="p-1.5 text-slate-400 hover:text-white transition rounded-lg hover:bg-slate-900">
         <ChevronLeft className="w-4 h-4" />
       </button>
       
-      {/* Khung hiển thị trung tâm đóng vai trò nút kích hoạt Popover */}
+      {/* Nút chính hiển thị thông số kỳ hạn để click mở Popup */}
       <button 
         onClick={() => { setIsOpen(!isOpen); setViewMode('MONTH'); setNavYear(selectedYear); }}
         className={`flex items-center justify-center gap-2 px-3 py-1.5 min-w-[145px] rounded-lg transition group hover:bg-slate-900 ${textColor}`}
@@ -112,16 +107,25 @@ export default function MonthPicker({ value, onChange, accent = 'default' }: Mon
         <ChevronDown className="w-3.5 h-3.5 opacity-50" />
       </button>
 
-      {/* Nút bấm mũi tên tiến nhanh bên phải */}
-      <button onClick={() => handleStepNext()} className="p-1.5 text-slate-400 hover:text-white transition rounded-lg hover:bg-slate-900">
+      {/* Mũi tên điều hướng tiến */}
+      <button onClick={handleStepNext} className="p-1.5 text-slate-400 hover:text-white transition rounded-lg hover:bg-slate-900">
         <ChevronRight className="w-4 h-4" />
       </button>
 
-      {/* BẢNG CHỌN TIẾN TIẾN DẠNG LƯỚI KHÔNG THANH CUỘN (MATERIAL GRID POPUP) */}
+      {/* BẢNG CHỌN TIẾN TIẾN DẠNG LƯỚI 3x4 ÉP ĐỊNH VỊ CHUẨN XUỐNG DƯỚI NÚT BẤM */}
       {isOpen && (
-        <div className={`absolute top-full left-1/2 -translate-x-1/2 mt-2 w-64 bg-slate-900 border ${borderTheme} rounded-2xl shadow-2xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150`}>
-          
-          {/* Thanh điều khiển trên đầu Popup */}
+        <div 
+          className={`bg-slate-900 border ${borderTheme} rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150`}
+          style={{ 
+            position: 'absolute', 
+            top: '100%', 
+            right: 0, 
+            marginTop: '0.5rem', 
+            zIndex: 100,
+            width: '16rem' 
+          }}
+        >
+          {/* Thanh điều khiển điều hướng năm bên trong Popup */}
           <div className="flex justify-between items-center px-4 py-2.5 border-b border-slate-800 bg-slate-950/60">
             <button 
               onClick={() => {
@@ -133,7 +137,6 @@ export default function MonthPicker({ value, onChange, accent = 'default' }: Mon
               <ChevronLeft className="w-3.5 h-3.5" />
             </button>
             
-            {/* Nhấp vào phần text hiển thị ở giữa để đổi chế độ lưới xem Tháng <=> xem Năm */}
             <button 
               onClick={() => setViewMode(viewMode === 'MONTH' ? 'YEAR' : 'MONTH')}
               className={`text-xs font-black font-mono tracking-wider hover:underline uppercase ${textColor}`}
@@ -152,11 +155,10 @@ export default function MonthPicker({ value, onChange, accent = 'default' }: Mon
             </button>
           </div>
 
-          {/* Vùng hiển thị ma trận các ô lựa chọn */}
+          {/* Khối Grid ma trận hiển thị 3x4 phẳng */}
           <div className="p-3 bg-slate-900">
             {viewMode === 'MONTH' ? (
-              // Chế độ 1: Lưới 3 cột x 4 hàng chọn THÁNG (Tuyệt đối không có thanh cuộn dọc)
-              <div className="grid grid-cols-3 gap-2">
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '0.5rem' }}>
                 {MONTH_LABELS.map((label, index) => {
                   const isCurrentActive = selectedYear === navYear && selectedMonth === index + 1;
                   return (
@@ -175,8 +177,7 @@ export default function MonthPicker({ value, onChange, accent = 'default' }: Mon
                 })}
               </div>
             ) : (
-              // Chế độ 2: Lưới 3 cột x 4 hàng chọn NĂM (Tuyệt đối không có thanh cuộn dọc)
-              <div className="grid grid-cols-3 gap-2">
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '0.5rem' }}>
                 {yearsGridArray.map((year) => {
                   const isCurrentActive = selectedYear === year;
                   return (

@@ -33,7 +33,6 @@ const convertToInputFormat = (periodStr: string) => {
   return `${year}-${month}`;
 };
 
-// Bỏ hàm generateMonthOptions ở đây vì đã chuyển sang MonthPicker
 
 export default function AdminFinancialLedger() {
   const { showToast, showConfirm } = useNotification();
