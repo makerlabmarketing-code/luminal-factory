@@ -162,7 +162,7 @@ export default function AdminFinancialLedger() {
   // --- PHÂN TRANG TRÊN DỮ LIỆU ĐÃ ĐƯỢC GOM NHÓM ---
   const totalPages = Math.ceil(finalGroupedData.length / itemsPerPage) || 1;
   const currentLedgerData = finalGroupedData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
-  
+
   const handleInsertLedger = async () => {
     const numericAmount = parseCurrency(amount);
     if (!category.trim() || !numericAmount) {
@@ -491,6 +491,19 @@ export default function AdminFinancialLedger() {
 
               <div><label className="text-slate-400">Nội dung khoản mục chi tiết:</label><input type="text" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 mt-1 focus:outline-none text-slate-200" value={editCategory} onChange={e => setEditCategory(e.target.value)} /></div>
               <div><label className="text-slate-400">Số tiền sửa (VND):</label><input type="text" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 mt-1 font-mono text-amber-400 font-bold focus:outline-none" value={editAmount} onChange={e => setEditAmount(formatCurrency(e.target.value))} /></div>
+              <div className="animate-fadeIn">
+                <label className="text-slate-400">Nhân sự thực hiện:</label>
+                <select 
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 mt-1 focus:outline-none cursor-pointer text-slate-200" 
+                  value={editReporter} 
+                  onChange={e => setEditReporter(e.target.value)}
+                >
+                  <option value="Admin (Hệ thống)">Admin (Hệ thống)</option>
+                  {employees.map(e => (
+                    <option key={e.id} value={e.full_name}>{e.full_name}</option>
+                  ))}
+                </select>
+              </div>
               <div className="pt-2"><label className="flex items-center gap-2 cursor-pointer p-3 bg-slate-950 border border-slate-800 rounded-xl hover:border-blue-500 transition"><input type="checkbox" checked={editIsPaid} onChange={e => setEditIsPaid(e.target.checked)} className="accent-blue-500 w-4 h-4 cursor-pointer" /><span className="text-slate-300 font-bold">Đã chi trả tất toán</span></label></div>
             </div>
             <div className="pt-2 border-t border-slate-800 flex gap-2"><button onClick={() => { setShowEditModal(false); setEditingId(null); }} className="flex-1 bg-slate-950 border border-slate-800 p-3 rounded-xl font-bold text-slate-400 hover:text-slate-200 transition">Hủy</button><button onClick={handleSaveEdit} className="flex-1 bg-blue-600 hover:bg-blue-700 transition text-white font-black p-3 rounded-xl shadow-lg">Cập Nhật</button></div>
