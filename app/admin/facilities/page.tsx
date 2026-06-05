@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useNotification } from '@/component/NotificationContext';
-import { fetchCoordinatesFromAddress } from '@/ultis/geocoding'; // Đường dẫn import đồng bộ chính xác
+import { fetchCoordinatesFromAddress } from '@/ultis/geocoding'; 
 import { MapPin, Plus, Trash2, Edit2, X, RefreshCcw, Navigation, Loader2 } from 'lucide-react';
 
 export default function AdminFacilitiesManagement() {
@@ -12,9 +12,10 @@ export default function AdminFacilitiesManagement() {
   const [loading, setLoading] = useState(true);
   const [isGeocoding, setIsGeocoding] = useState(false);
   const [showModal, setShowModal] = useState(false);
+  
+  // States for CRUD
   const [isEditing, setIsEditing] = useState(false);
-
-  const [code, setCode] = useState('');
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [name, setName] = useState('');
   const [address, setAddress] = useState('');
   const [lat, setLat] = useState('');
@@ -24,15 +25,24 @@ export default function AdminFacilitiesManagement() {
   const loadFacilities = async () => {
     setLoading(true);
     try {
-      const { data: meta } = await supabase.from('system_metadata').select('data').eq('name', 'Danh sách Chi nhánh').maybeSingle();
-      setBranches(meta?.data || []);
-    } catch (e) {
+      // ĐỔI SANG ĐỌC TỪ BẢNG FACILITIES CHUẨN
+      const { data, error } = await supabase
+        .from('facilities')
+        .select('*')
+        .order('id', { ascending: true });
+        
+      if (error) throw error;
+      setBranches(data || []);
+    } catch (e: any) {
       console.error(e);
+      showToast('Lỗi tải dữ liệu', e.message, 'error');
     }
     setLoading(false);
   };
 
-  useEffect(() => { loadFacilities(); }, []);
+  useEffect(() => { 
+    loadFacilities(); 
+  }, []);
 
   const handleGeocode = async () => {
     if (!address.trim()) {
@@ -54,12 +64,24 @@ export default function AdminFacilitiesManagement() {
   };
 
   const handleOpenAdd = () => {
-    setIsEditing(false); setCode(`CN${branches.length + 1}`); setName(''); setAddress(''); setLat(''); setLng(''); setRadius('20');
+    setIsEditing(false); 
+    setEditingId(null);
+    setName(''); 
+    setAddress(''); 
+    setLat(''); 
+    setLng(''); 
+    setRadius('20');
     setShowModal(true);
   };
 
   const handleOpenEdit = (b: any) => {
-    setIsEditing(true); setCode(b.code); setName(b.name); setAddress(b.address || ''); setLat(b.lat?.toString() || ''); setLng(b.lng?.toString() || ''); setRadius(b.radius?.toString() || '20');
+    setIsEditing(true); 
+    setEditingId(b.id); 
+    setName(b.facility_name); 
+    setAddress(b.address || ''); 
+    setLat(b.lat?.toString() || ''); 
+    setLng(b.lng?.toString() || ''); 
+    setRadius(b.radius?.toString() || '20');
     setShowModal(true);
   };
 
@@ -69,43 +91,53 @@ export default function AdminFacilitiesManagement() {
       return;
     }
 
-    let updatedList = [...branches];
-    const newFacility = { code, name: name.trim(), address: address.trim(), lat: Number(lat), lng: Number(lng), radius: Number(radius) };
-
-    if (isEditing) {
-      updatedList = updatedList.map(b => b.code === code ? newFacility : b);
-    } else {
-      if (branches.some(b => b.code === code)) {
-        showToast('Trùng mã', 'Mã cơ sở phân phối này đã tồn tại trên hệ thống!', 'error');
-        return;
-      }
-      updatedList.push(newFacility);
-    }
+    const payload = {
+      facility_name: name.trim(),
+      address: address.trim(),
+      lat: Number(lat),
+      lng: Number(lng),
+      radius: Number(radius)
+    };
 
     try {
-      const { error } = await supabase
-        .from('system_metadata')
-        .upsert({ name: 'Danh sách Chi nhánh', data: updatedList }, { onConflict: 'name' });
-      
-      if (error) throw error;
+      if (isEditing && editingId) {
+        // CẬP NHẬT
+        const { error } = await supabase
+          .from('facilities')
+          .update(payload)
+          .eq('id', editingId);
+        
+        if (error) throw error;
+        showToast('Thành công', 'Đã cập nhật dữ liệu cơ sở thành công!', 'success');
+      } else {
+        // THÊM MỚI
+        const { error } = await supabase
+          .from('facilities')
+          .insert([payload]);
+          
+        if (error) throw error;
+        showToast('Thành công', '✨ Đã thêm mới cơ sở chi nhánh vào rào chắn GPS Geofencing!', 'success');
+      }
 
       setShowModal(false); 
-      await loadFacilities();
-      showToast('Thành công', isEditing ? 'Đã cập nhật dữ liệu cơ sở thành công!' : '✨ Đã thêm mới cơ sở chi nhánh vào rào chắn GPS Geofencing thành công!', 'success');
+      loadFacilities();
     } catch (err: any) {
       showToast('Lỗi đám mây', err.message, 'error');
     }
   };
 
-  const handleDelete = (facilityCode: string) => {
-    showConfirm('Xác nhận gỡ cơ sở', 'Sếp có chắc chắn muốn xóa vĩnh viễn chi nhánh này không? Nhân sự gán vào cơ sở này sẽ tạm thời không thể chấm công.', async () => {
+  const handleDelete = (id: number) => {
+    showConfirm('Xác nhận gỡ cơ sở', 'Sếp có chắc chắn muốn xóa vĩnh viễn chi nhánh này không? Nhân sự gán vào cơ sở này sẽ không thể chấm công.', async () => {
       try {
-        const updatedList = branches.filter(b => b.code !== facilityCode);
-        const { error } = await supabase.from('system_metadata').upsert({ name: 'Danh sách Chi nhánh', data: updatedList }, { onConflict: 'name' });
+        const { error } = await supabase
+          .from('facilities')
+          .delete()
+          .eq('id', id);
         
         if (error) throw error;
-        await loadFacilities();
+        
         showToast('Đã gỡ bỏ', 'Đã gỡ chi nhánh ra khỏi bản đồ định vị GPS.', 'success');
+        loadFacilities();
       } catch (err: any) {
         showToast('Lỗi hệ thống', err.message, 'error');
       }
@@ -127,22 +159,41 @@ export default function AdminFacilitiesManagement() {
       <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
         <table className="w-full text-left text-xs text-slate-300">
           <thead className="bg-slate-950 text-slate-400 font-semibold border-b border-slate-800 uppercase text-[10px]">
-            <tr><th className="p-4">Tên Cơ Sở / Chi Nhánh</th><th className="p-4">Địa Chỉ Thực Tế Tại Xưởng</th><th className="p-4">Vĩ Độ</th><th className="p-4">Kinh Độ</th><th className="p-4">Vùng An Toàn</th><th className="p-4 text-center w-24">Thao tác</th></tr>
+            <tr>
+              <th className="p-4 w-[25%]">Tên Cơ Sở / Chi Nhánh</th>
+              <th className="p-4 w-[35%]">Địa Chỉ Thực Tế Tại Xưởng</th>
+              <th className="p-4 w-[12%]">Vĩ Độ</th>
+              <th className="p-4 w-[12%]">Kinh Độ</th>
+              <th className="p-4 w-[10%]">Vùng An Toàn</th>
+              <th className="p-4 w-[6%] text-center">Thao tác</th>
+            </tr>
           </thead>
           <tbody className="divide-y divide-slate-800/60 font-medium text-[11px]">
-            {branches.map(b => (
-              <tr key={b.code} className="hover:bg-slate-950/20 transition">
-                <td className="p-4 font-bold text-slate-200">🏛️ {b.name} <br/><span className="text-[9px] text-slate-500 font-mono bg-slate-950 px-1.5 py-0.5 rounded border border-slate-850 mt-1 block w-fit">{b.code}</span></td>
-                <td className="p-4 text-slate-400 max-w-xs truncate">{b.address}</td>
-                <td className="p-4 font-mono font-bold text-blue-400">{b.lat}</td>
-                <td className="p-4 font-mono font-bold text-blue-400">{b.lng}</td>
-                <td className="p-4 font-bold text-amber-400 font-mono">{b.radius} mét</td>
-                <td className="p-4 text-center space-x-1">
-                  <button onClick={() => handleOpenEdit(b)} className="p-1.5 bg-slate-950 border border-slate-800 rounded-lg text-blue-400 hover:bg-slate-800 transition"><Edit2 className="w-3.5 h-3.5" /></button>
-                  <button onClick={() => handleDelete(b.code)} className="p-1.5 bg-slate-950 border border-slate-800 rounded-lg text-red-500 hover:bg-red-950/20 transition"><Trash2 className="w-3.5 h-3.5" /></button>
+            {branches.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="text-center p-8 text-slate-500 italic">
+                  Chưa có dữ liệu cơ sở xưởng trên hệ thống.
                 </td>
               </tr>
-            ))}
+            ) : (
+              branches.map(b => (
+                <tr key={b.id} className="hover:bg-slate-950/20 transition">
+                  <td className="p-4 font-bold text-slate-200">
+                    🏛️ {b.facility_name} 
+                    <br/>
+                    <span className="text-[9px] text-slate-500 font-mono bg-slate-950 px-1.5 py-0.5 rounded border border-slate-850 mt-1 block w-fit">ID: {b.id}</span>
+                  </td>
+                  <td className="p-4 text-slate-400 max-w-xs truncate" title={b.address}>{b.address}</td>
+                  <td className="p-4 font-mono font-bold text-blue-400">{b.lat}</td>
+                  <td className="p-4 font-mono font-bold text-blue-400">{b.lng}</td>
+                  <td className="p-4 font-bold text-amber-400 font-mono">{b.radius} mét</td>
+                  <td className="p-4 text-center space-x-1">
+                    <button onClick={() => handleOpenEdit(b)} className="p-1.5 bg-slate-950 border border-slate-800 rounded-lg text-blue-400 hover:bg-slate-800 transition" title="Chỉnh sửa"><Edit2 className="w-3.5 h-3.5" /></button>
+                    <button onClick={() => handleDelete(b.id)} className="p-1.5 bg-slate-950 border border-slate-800 rounded-lg text-red-500 hover:bg-red-950/20 transition" title="Xóa cơ sở"><Trash2 className="w-3.5 h-3.5" /></button>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
@@ -156,7 +207,10 @@ export default function AdminFacilitiesManagement() {
             </div>
             
             <div className="space-y-3">
-              <div><label className="text-slate-400 font-medium">Tên gợi nhớ cơ sở làm việc:</label><input type="text" placeholder="Ví dụ: Xưởng CNC Số 1 - Hà Nội" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 mt-1.5 focus:outline-none text-slate-200" value={name} onChange={e => setName(e.target.value)} /></div>
+              <div>
+                <label className="text-slate-400 font-medium">Tên gợi nhớ cơ sở làm việc:</label>
+                <input type="text" placeholder="Ví dụ: Xưởng CNC Số 1 - Hà Nội" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 mt-1.5 focus:outline-none text-slate-200" value={name} onChange={e => setName(e.target.value)} />
+              </div>
               <div>
                 <label className="text-slate-400 font-medium">Địa chỉ thực tế xưởng:</label>
                 <div className="flex gap-2 mt-1.5">

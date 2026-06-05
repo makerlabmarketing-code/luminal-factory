@@ -5,8 +5,7 @@ export async function POST(request: Request) {
   try {
     const { passcode } = await request.json();
 
-    // Thay đổi mật mã quản trị tối cao của bạn tại đây (Ví dụ: 2026)
-    if (passcode === '2026') {
+    if (passcode === 'LF2026@') {
       const response = NextResponse.json({ success: true, message: 'Xác thực thành công!' });
       
       // Thiết lập Session Cookie mã hóa ở tầng Server

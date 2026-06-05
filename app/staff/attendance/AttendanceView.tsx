@@ -30,26 +30,17 @@ export function StaffAttendanceContent({ token: propsToken, workerData }: any) {
     }
   };
 
-  // Hàm helper đối sánh chi nhánh an toàn, tránh trùng lặp từ khóa "test" của tài khoản
+  // Hàm helper đối sánh chi nhánh chuẩn từ bảng Facilities mới
   const findMatchedBranch = (workerObj: any, branchList: any[]) => {
     return branchList.find((b: any) => {
-      const branchCodeLower = b.code?.toLowerCase();
-      const branchNameLower = b.name?.toLowerCase();
-
-      if (workerObj.branch_code?.toLowerCase() === branchCodeLower) return true;
-      if (workerObj.branch?.toLowerCase() === branchCodeLower) return true;
-      if (workerObj.facility_code?.toLowerCase() === branchCodeLower) return true;
-
-      return Object.entries(workerObj).some(([key, val]) => {
-        if (typeof val !== 'string') return false;
-        const valLower = val.toLowerCase();
-        
-        if (['full_name', 'username', 'email', 'id', 'qr_token'].includes(key)) {
-          return valLower === branchCodeLower;
-        }
-        
-        return valLower === branchCodeLower || valLower === branchNameLower;
-      });
+      // Khớp ưu tiên số 1: Thông qua ID lưu trong branch_code
+      if (String(workerObj.branch_code) === String(b.id)) return true;
+      
+      // Khớp dự phòng data cũ (nếu lỡ lưu tên)
+      const branchNameLower = b.facility_name?.toLowerCase();
+      if (workerObj.branch_code?.toLowerCase() === branchNameLower) return true;
+      
+      return false;
     });
   };
 
@@ -57,11 +48,10 @@ export function StaffAttendanceContent({ token: propsToken, workerData }: any) {
     const timer = setInterval(() => setLiveTime(new Date()), 1000);
     
     const initialize = async () => {
-      setFetching(true); // Reset trạng thái loading khi bắt đầu đồng bộ dữ liệu
+      setFetching(true);
       let finalWorker: any = null;
 
       try {
-        // Kéo dữ liệu nhân sự tươi từ DB về để tránh bộ nhớ đệm cache cũ
         if (workerData?.id) {
           const { data: freshEmp } = await supabase.from('employees').select('*').eq('id', workerData.id).maybeSingle();
           finalWorker = freshEmp || workerData; 
@@ -73,13 +63,13 @@ export function StaffAttendanceContent({ token: propsToken, workerData }: any) {
         if (finalWorker) {
           setWorker(finalWorker);
           
-          // Tiến hành đối sánh định vị chi nhánh làm việc
           try {
-            const { data: metaBranch } = await supabase.from('system_metadata').select('data').eq('name', 'Danh sách Chi nhánh').maybeSingle();
-            const branchData = metaBranch?.data || [];
+            // LẤY DỮ LIỆU TỪ BẢNG FACILITIES
+            const { data: facs } = await supabase.from('facilities').select('*');
+            const branchData = facs || [];
             
             const matchedBranch = findMatchedBranch(finalWorker, branchData);
-            setLocalBranchName(matchedBranch ? matchedBranch.name : 'Chưa gán cơ sở');
+            setLocalBranchName(matchedBranch ? matchedBranch.facility_name : 'Chưa gán cơ sở');
           } catch (err) {
             setLocalBranchName('Lỗi đồng bộ chi nhánh');
           }
@@ -118,14 +108,15 @@ export function StaffAttendanceContent({ token: propsToken, workerData }: any) {
     if (!navigator.geolocation) return showToast('Lỗi thiết bị', 'Thiết bị không hỗ trợ định vị GPS!', 'error');
 
     try {
-      const { data: metaBranch } = await supabase.from('system_metadata').select('data').eq('name', 'Danh sách Chi nhánh').maybeSingle();
-      const branchData = metaBranch?.data || [];
+      // LẤY LẠI TỌA ĐỘ MỚI NHẤT TỪ BẢNG FACILITIES
+      const { data: facs } = await supabase.from('facilities').select('*');
+      const branchData = facs || [];
       
       const { data: freshEmp } = await supabase.from('employees').select('*').eq('id', worker.id).maybeSingle();
       const activeWorker = freshEmp || worker;
 
       const matchedBranch = findMatchedBranch(activeWorker, branchData);
-      setLocalBranchName(matchedBranch ? matchedBranch.name : 'Chưa gán cơ sở');
+      setLocalBranchName(matchedBranch ? matchedBranch.facility_name : 'Chưa gán cơ sở');
 
       if (!matchedBranch) return showToast('Lỗi địa điểm', 'Cơ sở được giao của bạn chưa được cấu hình tọa độ rào ranh giới GPS!', 'error');
 
@@ -136,7 +127,7 @@ export function StaffAttendanceContent({ token: propsToken, workerData }: any) {
         const distance = calculateDistance(uLat, uLng, matchedBranch.lat, matchedBranch.lng);
 
         if (distance > matchedBranch.radius) {
-          return showToast('Từ Chối Chấm Công', `Vị trí sai! Bạn đang đứng cách cơ sở được chỉ định [${matchedBranch.name}] khoảng ${Math.round(distance)} mét (Yêu cầu phải < ${matchedBranch.radius}m).`, 'error');
+          return showToast('Từ Chối Chấm Công', `Vị trí sai! Bạn đang đứng cách cơ sở [${matchedBranch.facility_name}] khoảng ${Math.round(distance)} mét (Yêu cầu phải < ${matchedBranch.radius}m).`, 'error');
         }
 
         const todayStr = new Date().toLocaleDateString('en-CA');
@@ -145,7 +136,7 @@ export function StaffAttendanceContent({ token: propsToken, workerData }: any) {
 
         if (!isInShift) {
           await supabase.from('attendance').insert([{ employee_id: activeWorker.id, employee_name: activeWorker.full_name, work_date: todayStr, check_in: timeStr, shift_name: currentShift, status: 'PRESENT' }]);
-          showToast('Vào ca thành công', `✓ Đã ghi nhận [${currentShift}] tại [${matchedBranch.name}] lúc ${timeStr}.`, 'success');
+          showToast('Vào ca thành công', `✓ Đã ghi nhận [${currentShift}] tại [${matchedBranch.facility_name}] lúc ${timeStr}.`, 'success');
         } else {
           await supabase.from('attendance').update({ check_out: timeStr }).eq('employee_id', activeWorker.id).eq('work_date', todayStr);
           showToast('Tắt máy về', `✓ Đã tan ca [${currentShift}] thành công!`, 'success');
@@ -163,7 +154,7 @@ export function StaffAttendanceContent({ token: propsToken, workerData }: any) {
     }
   };
 
-  // 1. Trạng thái đang tải dữ liệu từ DB về
+  // 1. Trạng thái đang tải dữ liệu
   if (fetching) {
     return (
       <div className="text-center p-12 text-xs text-slate-500 font-mono">
@@ -173,7 +164,7 @@ export function StaffAttendanceContent({ token: propsToken, workerData }: any) {
     );
   }
 
-  // 2. Trạng thái lỗi không quét được tài khoản nhân sự phù hợp
+  // 2. Trạng thái lỗi
   if (!worker) {
     return (
       <div className="flex flex-col items-center justify-center p-10 bg-slate-900 border border-slate-800 rounded-3xl space-y-3 shadow-xl max-w-md mx-auto mt-6 text-center text-xs text-slate-300 w-full animate-fadeIn">
@@ -184,7 +175,7 @@ export function StaffAttendanceContent({ token: propsToken, workerData }: any) {
     );
   }
 
-  // 3. Màn hình giao diện chấm công chuẩn khi đã có đủ data
+  // 3. Màn hình giao diện chấm công
   return (
     <div className="flex flex-col items-center justify-center p-10 bg-slate-900 border border-slate-800 rounded-3xl space-y-5 shadow-xl max-w-md mx-auto mt-6 animate-fadeIn w-full">
       <div className="text-center space-y-1">

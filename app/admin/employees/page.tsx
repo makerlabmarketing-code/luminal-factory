@@ -33,19 +33,20 @@ export default function AdminEmployeesManagement() {
   const [role, setRole] = useState('STAFF'); 
   const [bankName, setBankName] = useState('MB');
   const [bankAccountNumber, setBankAccountNumber] = useState('');
-  const [branchCode, setBranchCode] = useState('CN1');
+  const [branchCode, setBranchCode] = useState('');
 
   const loadData = async () => {
     setLoading(true);
     try {
-      const { data: metaBranch } = await supabase.from('system_metadata').select('data').eq('name', 'Danh sách Chi nhánh').maybeSingle();
-      setBranches(metaBranch?.data || [
-        { "code": "CN1", "name": "Xưởng chính Luminal Hà Nội", "lat": 20.982252, "lng": 105.886674, "radius": 20 },
-        { "code": "CN2", "name": "Văn phòng Điều hành - TP.HCM", "lat": 10.762622, "lng": 106.660172, "radius": 150 }
-      ]);
+      // ĐỌC DỮ LIỆU TỪ BẢNG FACILITIES CHUẨN
+      const { data: facs } = await supabase.from('facilities').select('*').order('id', { ascending: true });
+      setBranches(facs || []);
+
       const { data: emps } = await supabase.from('employees').select('*').order('id', { ascending: false });
       setEmployees(emps || []);
-    } catch (e) { console.error(e); }
+    } catch (e) { 
+      console.error(e); 
+    }
     setLoading(false);
   };
 
@@ -54,7 +55,8 @@ export default function AdminEmployeesManagement() {
   const handleOpenAdd = () => {
     setIsEditing(false); setTargetId(''); setFullName(''); setEmail(''); setPhone(''); setAddress(''); setCccd(''); 
     setDriveCccd(''); setDriveContract(''); setStatus('ACTIVE'); setRole('STAFF'); setBankName('MB'); setBankAccountNumber('');
-    setBranchCode(branches[0]?.code || 'CN1'); setShowModal(true);
+    setBranchCode(branches[0] ? String(branches[0].id) : ''); 
+    setShowModal(true);
   };
 
   const handleOpenEdit = (emp: any) => {
@@ -63,23 +65,27 @@ export default function AdminEmployeesManagement() {
     setDriveCccd(emp.drive_cccd || ''); setDriveContract(emp.drive_contract || ''); 
     setTitle(emp.title || 'Kỹ thuật'); setLevel(emp.level || 'A1'); setStatus(emp.status || 'ACTIVE'); setRole(emp.role || 'STAFF'); 
     setBankName(emp.bank_name || 'MB'); setBankAccountNumber(emp.bank_account_number || '');
-    setBranchCode(emp.branch_code || 'CN1'); setShowModal(true);
+    setBranchCode(emp.branch_code || (branches[0] ? String(branches[0].id) : '')); 
+    setShowModal(true);
   };
 
   const handleSave = async () => {
     if (!fullName.trim()) return showToast('Thiếu thông tin', 'Sếp vui lòng nhập họ tên Nhân sự!', 'error');
+    if (!branchCode) return showToast('Lỗi cấu hình', 'Phải có ít nhất 1 cơ sở xưởng để gán nhân sự!', 'error');
     
     const payload: any = { 
       full_name: fullName.trim(), email: email.trim(), phone: phone.trim(), address: address.trim(), cccd: cccd.trim(), 
       drive_cccd: driveCccd.trim(), drive_contract: driveContract.trim(), title, level, status, role,
-      bank_name: bankName, bank_account_number: bankAccountNumber.trim(), branch_code: branchCode
+      bank_name: bankName, bank_account_number: bankAccountNumber.trim(), branch_code: String(branchCode)
     };
     
     if (!isEditing) payload.qr_token = crypto.randomUUID();
+    
     if (isEditing) await supabase.from('employees').update(payload).eq('id', targetId);
     else await supabase.from('employees').insert([payload]);
     
-    setShowModal(false); loadData(); 
+    setShowModal(false); 
+    loadData(); 
     showToast('Thành công', 'Hồ sơ nhân sự đã được đồng bộ lên mây!', 'success');
   };
 
@@ -100,7 +106,7 @@ export default function AdminEmployeesManagement() {
 
   const filtered = employees.filter(e => {
     const matchText = (e.full_name || '').toLowerCase().includes(searchTerm.toLowerCase()) || (e.title || '').toLowerCase().includes(searchTerm.toLowerCase());
-    const matchBranch = selectedBranchFilter === 'ALL' || e.branch_code === selectedBranchFilter;
+    const matchBranch = selectedBranchFilter === 'ALL' || String(e.branch_code) === String(selectedBranchFilter);
     return matchText && matchBranch;
   });
 
@@ -120,7 +126,7 @@ export default function AdminEmployeesManagement() {
           <div className="flex items-center gap-3 w-full sm:w-auto">
             <select className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-bold text-slate-300 focus:outline-none cursor-pointer" value={selectedBranchFilter} onChange={e => { setSelectedBranchFilter(e.target.value); setCurrentPage(1); }}>
               <option value="ALL">🌐 Tất cả cơ sở làm việc</option>
-              {branches.map(b => <option key={b.code} value={b.code}>🏭 {b.name}</option>)}
+              {branches.map(b => <option key={b.id} value={String(b.id)}>🏭 {b.facility_name}</option>)}
             </select>
             <div className="relative flex-1 sm:w-64">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" />
@@ -142,41 +148,50 @@ export default function AdminEmployeesManagement() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60 text-[11px]">
-              {currentData.map(emp => (
-                <tr key={emp.id} className="hover:bg-slate-950/20 transition">
-                  <td className="p-4 font-bold text-slate-200">{emp.full_name} <br/><span className="text-[10px] text-slate-500 font-mono font-medium">{emp.title} ({emp.level})</span></td>
-                  <td className="p-4">
-                    <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${emp.status === 'ACTIVE' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>{emp.status === 'ACTIVE' ? 'Đang làm' : 'Nghỉ việc'}</span>
-                  </td>
-                  <td className="p-4 font-bold text-slate-400 flex items-center gap-1 mt-1.5"><MapPin className="w-3.5 h-3.5 text-blue-400"/> {branches.find(b=>b.code===emp.branch_code)?.name || 'Chưa gán'}</td>
-                  <td className="p-4 font-mono text-slate-400">{emp.bank_name} - {emp.bank_account_number || '⏳ Chưa kê khai'}</td>
-                  <td className="p-4"><button onClick={() => handleCopyLink(emp.qr_token)} className="flex items-center gap-1.5 text-purple-400 hover:text-purple-300 font-mono text-[10px] bg-purple-950/30 border border-purple-800/30 px-2.5 py-1 rounded-lg transition">Link Portal</button></td>
-                  <td className="p-4 text-center space-x-1 font-sans">
-                    <button onClick={() => handleOpenEdit(emp)} className="p-1.5 bg-slate-950 border border-slate-800 rounded-lg text-blue-400 hover:bg-slate-800 transition"><Edit2 className="w-3.5 h-3.5" /></button>
-                    <button onClick={() => handleDelete(emp.id)} className="p-1.5 bg-slate-950 border border-slate-800 rounded-lg text-red-500 hover:bg-red-950/20 transition"><Trash2 className="w-3.5 h-3.5" /></button>
-                  </td>
-                </tr>
-              ))}
+              {currentData.length === 0 ? (
+                <tr><td colSpan={6} className="text-center p-8 text-slate-500 italic">Không tìm thấy dữ liệu nhân sự.</td></tr>
+              ) : (
+                currentData.map(emp => (
+                  <tr key={emp.id} className="hover:bg-slate-950/20 transition">
+                    <td className="p-4 font-bold text-slate-200">{emp.full_name} <br/><span className="text-[10px] text-slate-500 font-mono font-medium">{emp.title} ({emp.level})</span></td>
+                    <td className="p-4">
+                      <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${emp.status === 'ACTIVE' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>{emp.status === 'ACTIVE' ? 'Đang làm' : 'Nghỉ việc'}</span>
+                    </td>
+                    <td className="p-4 font-bold text-slate-400 flex items-center gap-1 mt-1.5">
+                      <MapPin className="w-3.5 h-3.5 text-blue-400"/> 
+                      {branches.find(b => String(b.id) === String(emp.branch_code))?.facility_name || 'Chưa gán'}
+                    </td>
+                    <td className="p-4 font-mono text-slate-400">{emp.bank_name} - {emp.bank_account_number || '⏳ Chưa kê khai'}</td>
+                    <td className="p-4"><button onClick={() => handleCopyLink(emp.qr_token)} className="flex items-center gap-1.5 text-purple-400 hover:text-purple-300 font-mono text-[10px] bg-purple-950/30 border border-purple-800/30 px-2.5 py-1 rounded-lg transition">Link Portal</button></td>
+                    <td className="p-4 text-center space-x-1 font-sans">
+                      <button onClick={() => handleOpenEdit(emp)} className="p-1.5 bg-slate-950 border border-slate-800 rounded-lg text-blue-400 hover:bg-slate-800 transition"><Edit2 className="w-3.5 h-3.5" /></button>
+                      <button onClick={() => handleDelete(emp.id)} className="p-1.5 bg-slate-950 border border-slate-800 rounded-lg text-red-500 hover:bg-red-950/20 transition"><Trash2 className="w-3.5 h-3.5" /></button>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
 
         {/* PHÂN TRANG */}
-        <div className="p-4 bg-slate-950/50 border-t border-slate-800 flex justify-between items-center text-xs font-mono text-slate-400">
-          <div>Total <span className="text-blue-400 font-bold">{filtered.length}</span> items</div>
-          <div className="flex gap-1">
-            <button onClick={() => setCurrentPage(1)} disabled={currentPage === 1} className="p-1.5 bg-slate-900 border rounded disabled:opacity-20"><ChevronsLeft className="w-4 h-4" /></button>
-            <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="p-1.5 bg-slate-900 border rounded disabled:opacity-20"><ChevronLeft className="w-4 h-4" /></button>
-            <span className="px-2 font-bold self-center text-slate-200">{currentPage} / {totalPages}</span>
-            <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="p-1.5 bg-slate-900 border rounded disabled:opacity-20"><ChevronRight className="w-4 h-4" /></button>
-            <button onClick={() => setCurrentPage(totalPages)} disabled={currentPage === totalPages} className="p-1.5 bg-slate-900 border rounded disabled:opacity-20"><ChevronsRight className="w-4 h-4" /></button>
+        {filtered.length > 0 && (
+          <div className="p-4 bg-slate-950/50 border-t border-slate-800 flex justify-between items-center text-xs font-mono text-slate-400">
+            <div>Total <span className="text-blue-400 font-bold">{filtered.length}</span> items</div>
+            <div className="flex gap-1">
+              <button onClick={() => setCurrentPage(1)} disabled={currentPage === 1} className="p-1.5 bg-slate-900 border rounded disabled:opacity-20"><ChevronsLeft className="w-4 h-4" /></button>
+              <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="p-1.5 bg-slate-900 border rounded disabled:opacity-20"><ChevronLeft className="w-4 h-4" /></button>
+              <span className="px-2 font-bold self-center text-slate-200">{currentPage} / {totalPages}</span>
+              <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="p-1.5 bg-slate-900 border rounded disabled:opacity-20"><ChevronRight className="w-4 h-4" /></button>
+              <button onClick={() => setCurrentPage(totalPages)} disabled={currentPage === totalPages} className="p-1.5 bg-slate-900 border rounded disabled:opacity-20"><ChevronsRight className="w-4 h-4" /></button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* MODAL CẬP NHẬT HỒ SƠ */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 w-full max-w-2xl space-y-4 text-xs text-slate-200 max-h-[90vh] overflow-y-auto shadow-2xl">
             <div className="flex justify-between items-center border-b border-slate-800 pb-3">
               <h3 className="font-bold text-blue-500 uppercase tracking-wider text-[13px]">{isEditing ? 'SỬA HỒ SƠ THÀNH VIÊN' : 'THÊM MỚI HỒ SƠ THÀNH VIÊN'}</h3>
@@ -205,7 +220,8 @@ export default function AdminEmployeesManagement() {
                 <div className="font-bold text-slate-400 uppercase text-[9px] tracking-wider">3. Chỉ định cơ sở làm việc (GPS Geofencing)</div>
                 <div>
                   <select className="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 mt-1 focus:outline-none cursor-pointer text-blue-400 font-bold" value={branchCode} onChange={(e) => setBranchCode(e.target.value)}>
-                    {branches.map(b => <option key={b.code} value={b.code}>🏭 {b.name} (Bán kính an toàn {b.radius}m)</option>)}
+                    {branches.length === 0 && <option value="">-- Chưa có cơ sở nào --</option>}
+                    {branches.map(b => <option key={b.id} value={String(b.id)}>🏭 {b.facility_name} (Bán kính an toàn {b.radius}m)</option>)}
                   </select>
                 </div>
               </div>
