@@ -78,7 +78,7 @@ export function StaffTasksContent({ token: propsToken, workerData }: any) {
 
   const handleStaffRefresh = async () => {
     await loadTasksData();
-    showToast('Hệ thống', 'Đã nạp lại tiến độ ca máy mới nhất từ Admin sếp!', 'info');
+    showToast('Hệ thống', 'Cập nhật thành công', 'success');
   };
 
   const handleBufferChange = (itemKey: string, taskIdx: number, field: string, value: string) => {
