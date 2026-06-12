@@ -1,4 +1,3 @@
-// app/admin/capital/components/LedgerMetrics.tsx
 'use client';
 import { Wallet, ArrowUpRight, TrendingUp, History, Banknote } from 'lucide-react';
 
@@ -69,7 +68,13 @@ export default function LedgerMetrics({
         <p className="text-emerald-400 text-[9px] flex items-center gap-1">
           <Banknote className="w-3 h-3"/> Tiền mặt trong két
         </p>
-        <p className="text-xs font-black text-emerald-400 mt-1 font-mono">{totalRemainingBalance.toLocaleString()} đ</p>
+        <p 
+          className={`text-xs font-black mt-1 font-mono ${
+            totalRemainingBalance >= 0 ? 'text-emerald-400' : 'text-red-400'
+          }`}
+        >
+          {totalRemainingBalance.toLocaleString()} đ
+        </p>
       </div>
     </div>
   );
