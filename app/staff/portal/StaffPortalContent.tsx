@@ -8,14 +8,15 @@ import { StaffTasksContent } from '../tasks/TasksView';
 import { StaffExpensesContent } from '../expenses/ExpensesView';
 import { StaffProfileContent } from '../profile/ProfileView';
 import { getStaffPortalData } from '@/services/staffPortalService';
-import type { StaffBranch, StaffEmployee, StaffPortalTab } from '@/lib/types/staff';
+import type { StaffPortalTab } from '@/lib/types/staff';
+import type { Facility } from '@/lib/types/facility';
 
 export default function StaffPortalContent() {
   const searchParams = useSearchParams();
   const token = searchParams.get('token');
 
-  const [worker, setWorker] = useState<StaffEmployee | null>(null);
-  const [assignedBranch, setAssignedBranch] = useState<StaffBranch | null>(null);
+  const [worker, setWorker] = useState<Employee | null>(null);
+  const [assignedBranch, setAssignedBranch] = useState<Facility | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<StaffPortalTab>('attendance');
 

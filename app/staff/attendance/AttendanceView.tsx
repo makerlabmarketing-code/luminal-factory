@@ -6,12 +6,12 @@ import { supabase } from '@/lib/supabase';
 import { useNotification } from '@/component/NotificationContext';
 import { Power, RefreshCcw, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { calculateHoursFromStrings, calculateSalary } from '@/services/payrollService';
-import type { StaffBranch } from '@/lib/types/staff';
+import type { Facility } from '@/lib/types/facility';
 
 interface AttendanceViewProps {
   token?: string | null;
   workerData?: Employee | null;
-  assignedBranchData?: StaffBranch | null;
+  assignedBranchData?: Facility | null;
 }
 
 interface Employee {

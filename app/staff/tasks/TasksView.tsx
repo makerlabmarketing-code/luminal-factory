@@ -1,6 +1,11 @@
 'use client';
-
-import { useEffect, useMemo, useState } from 'react';
+import type { Employee } from '@/lib/types/employee';
+import type {
+  EditableWorkflowTask,
+  WorkflowSetting,
+  WorkflowTask,
+} from '@/lib/types/workflow';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
   Activity,
@@ -15,12 +20,6 @@ import {
   Save,
 } from 'lucide-react';
 import { useNotification } from '@/component/NotificationContext';
-import type {
-  EditableWorkflowTask,
-  StaffEmployee,
-  WorkflowSetting,
-  WorkflowTask,
-} from '@/lib/types/staff';
 import {
   buildWorkflowEditMaps,
   getStaffTasksData,
@@ -33,7 +32,7 @@ import {
 
 interface StaffTasksContentProps {
   token?: string | null;
-  workerData?: StaffEmployee | null;
+  workerData?: Employee | null;
 }
 
 interface RenderableWorkflowTask extends WorkflowTask {
@@ -58,7 +57,7 @@ export function StaffTasksContent({
   const [localDriveInputs, setLocalDriveInputs] = useState<Record<string, string>>({});
   const [editableTasks, setEditableTasks] = useState<Record<string, EditableWorkflowTask>>({});
 
-  const loadTasksData = async () => {
+  const loadTasksData = useCallback(async () => {
     if (!token && !workerData) {
       setLoading(false);
       return;
@@ -90,11 +89,11 @@ export function StaffTasksContent({
     } finally {
       setLoading(false);
     }
-  };
+  }, [token, workerData, selectedProjectName]);
 
   useEffect(() => {
-    loadTasksData();
-  }, [token, workerData]);
+    void loadTasksData();
+  }, [loadTasksData]);
 
   const handleStaffRefresh = async () => {
     await loadTasksData();

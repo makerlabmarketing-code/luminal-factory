@@ -3,7 +3,10 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 import { RefreshCcw, Wallet, Banknote, ArrowUpRight, ArrowDownRight } from 'lucide-react';
-
+import type {
+  MonthlyChartData,
+  PieChartData,
+} from '@/lib/types/dashboard';
 // Bảng màu cho biểu đồ (Khớp với hệ màu Tailwind của dự án)
 const COLORS = {
   thu: '#34d399',      // emerald-400
@@ -16,8 +19,9 @@ const COLORS = {
 
 export default function DashboardCharts() {
   const [loading, setLoading] = useState(true);
-  const [monthlyData, setMonthlyData] = useState<any[]>([]);
-  const [pieData, setPieData] = useState<any[]>([]);
+  
+  const [monthlyData, setMonthlyData] = useState<MonthlyChartData[]>([]);
+  const [pieData, setPieData] = useState<PieChartData[]>([]);
   
   // State lưu trữ dữ liệu tổng kết theo năm (YTD)
   const [ytdStats, setYtdStats] = useState({

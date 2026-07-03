@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { X, Save, Plus, User, CheckCircle2, Trash2 } from 'lucide-react';
-import type { AttendanceRecord, Employee, Shift, ToastType } from '@/lib/types/attendance';
+import type { AttendanceRecord, Shift, ToastType } from '@/lib/types/attendance';
+import type { Employee } from "@/lib/types/employee";
 import {
   deleteAttendanceRecord,
   getEmployeeHourlyRate,

@@ -7,7 +7,7 @@ export interface Employee {
     branch_code?: string | null;
     phone?: string | null;
     bank_name?: string | null;
-    bank_account_number?: string | null;
+    bank_account_number?: string |null;
     hourly_rate?: number | string | null;
     base_salary_per_hour?: number | string | null;
   }
