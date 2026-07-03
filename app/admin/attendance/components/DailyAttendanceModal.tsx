@@ -128,17 +128,39 @@ export default function DailyAttendanceModal({
       const totalHours = calculateHoursFromStrings(timeIn, timeOut);
       const totalSalary = calculateSalary(totalHours, baseHourlyRate);
 
-      const { error } = await supabase.from('attendance').insert([{
-        employee_id: currentEmployee.id,
-        employee_name: currentEmployee.full_name,
-        work_date: dateStr,
-        shift_name: newShift,
-        check_in: timeIn,
-        check_out: timeOut,
-        total_hours: totalHours,      // Lưu số giờ chính xác 
-        total_salary: totalSalary,    // Lưu số tiền không làm tròn lệch
-        status: 'PRESENT'
-      }]);
+      const duplicatedRecord = existingRecords.find((record) => {
+        return (
+          String(record.employee_id) === String(currentEmployee.id) &&
+          record.work_date === dateStr &&
+          record.shift_name === newShift
+        );
+      });
+      
+      if (duplicatedRecord) {
+        showToast('Đã tồn tại', 'Nhân sự này đã có bản ghi cho ca đã chọn.', 'info');
+        setIsSubmitting(false);
+        return;
+      }
+      
+      const { error } = await supabase
+      .from('attendance')
+      .upsert(
+        {
+          employee_id: currentEmployee.id,
+          employee_name: currentEmployee.full_name,
+          work_date: dateStr,
+          shift_name: newShift,
+          check_in: timeIn,
+          check_out: timeOut,
+          total_hours: totalHours,
+          total_salary: totalSalary,
+          status: 'PRESENT',
+        },
+        {
+          onConflict: 'employee_id,work_date,shift_name',
+          ignoreDuplicates: true,
+        }
+      );
 
       if (error) throw error;
       showToast('Thành công', 'Đã bổ sung ca làm việc và tính toán lương chuẩn.', 'success');
