@@ -6,10 +6,12 @@ import { supabase } from '@/lib/supabase';
 import { useNotification } from '@/component/NotificationContext';
 import { Power, RefreshCcw, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { calculateHoursFromStrings, calculateSalary } from '@/services/payrollService';
+import type { StaffBranch } from '@/lib/types/staff';
 
 interface AttendanceViewProps {
   token?: string | null;
   workerData?: Employee | null;
+  assignedBranchData?: StaffBranch | null;
 }
 
 interface Employee {
@@ -44,11 +46,12 @@ interface AttendanceRecord {
 export function StaffAttendanceContent({
   token: propsToken,
   workerData,
+  assignedBranchData,
 }: AttendanceViewProps) {
   const { showToast } = useNotification();
   const searchParams = useSearchParams();
   const token = propsToken || searchParams.get('token');
-
+  void assignedBranchData;
   const [worker, setWorker] = useState<Employee | null>(null);
   const [localBranchName, setLocalBranchName] = useState('Đang nạp định vị...');
   const [isInShift, setIsInShift] = useState(false);

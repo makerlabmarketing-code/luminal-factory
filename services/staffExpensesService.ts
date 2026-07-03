@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
-import type { FinancialLedgerEntry, StaffEmployee } from '@/lib/types/staff';
+import type { Employee } from '@/lib/types/employee';
+import type { FinancialLedgerEntry } from '@/lib/types/finance';
 import { getStaffEmployeeByToken } from '@/services/staffPortalService';
 
 export function formatCurrency(value: string): string {
@@ -24,9 +25,9 @@ export function getCurrentMonthPeriod(): string {
 
 export async function getStaffExpensesData(params: {
   token?: string | null;
-  workerData?: StaffEmployee | null;
+  workerData?: Employee | null;
 }): Promise<{
-  employee: StaffEmployee | null;
+  employee: Employee | null;
   expenses: FinancialLedgerEntry[];
 }> {
   let employee = params.workerData || null;
@@ -57,7 +58,7 @@ export async function getStaffExpensesData(params: {
 }
 
 export async function submitStaffExpense(params: {
-  employee: StaffEmployee;
+  employee: Employee;
   category: string;
   amount: number;
   billUrl: string;

@@ -1,7 +1,8 @@
 import { supabase } from '@/lib/supabase';
-import type { StaffBranch, StaffEmployee } from '@/lib/types/staff';
+import type { Employee } from '@/lib/types/employee';
+import type { Facility } from '@/lib/types/facility';
 
-export async function getStaffEmployeeByToken(token: string): Promise<StaffEmployee | null> {
+export async function getStaffEmployeeByToken(token: string): Promise<Employee | null> {
   const { data, error } = await supabase
     .from('employees')
     .select('*')
@@ -10,10 +11,10 @@ export async function getStaffEmployeeByToken(token: string): Promise<StaffEmplo
 
   if (error) throw error;
 
-  return (data as StaffEmployee | null) || null;
+  return (data as Employee | null) || null;
 }
 
-export async function getStaffEmployeeById(employeeId: number | string): Promise<StaffEmployee | null> {
+export async function getStaffEmployeeById(employeeId: number | string): Promise<Employee | null> {
   const { data, error } = await supabase
     .from('employees')
     .select('*')
@@ -22,10 +23,10 @@ export async function getStaffEmployeeById(employeeId: number | string): Promise
 
   if (error) throw error;
 
-  return (data as StaffEmployee | null) || null;
+  return (data as Employee | null) || null;
 }
 
-export async function getMetadataBranches(): Promise<StaffBranch[]> {
+export async function getMetadataBranches(): Promise<Facility[]> {
   const { data, error } = await supabase
     .from('system_metadata')
     .select('data')
@@ -34,27 +35,25 @@ export async function getMetadataBranches(): Promise<StaffBranch[]> {
 
   if (error) throw error;
 
-  return Array.isArray(data?.data) ? (data.data as StaffBranch[]) : [];
+  return Array.isArray(data?.data) ? (data.data as Facility[]) : [];
 }
 
-export function findAssignedBranch(
-  employee: StaffEmployee,
-  branches: StaffBranch[]
-): StaffBranch | null {
+export function findAssignedBranch(employee: Employee, branches: Facility[]): Facility | null {
   const matchedBranch = branches.find((branch) => {
     if (branch.code && employee.branch_code && branch.code === employee.branch_code) return true;
     if (branch.name && employee.branch && branch.name === employee.branch) return true;
     if (branch.name && employee.branch_code && branch.name === employee.branch_code) return true;
+    if (branch.facility_name && employee.branch_code && branch.facility_name === employee.branch_code) return true;
 
     return false;
   });
 
-  return matchedBranch || branches[0] || null;
+  return matchedBranch || null;
 }
 
 export async function getStaffPortalData(token: string): Promise<{
-  employee: StaffEmployee | null;
-  assignedBranch: StaffBranch | null;
+  employee: Employee | null;
+  assignedBranch: Facility | null;
 }> {
   const employee = await getStaffEmployeeByToken(token);
 
@@ -66,10 +65,9 @@ export async function getStaffPortalData(token: string): Promise<{
   }
 
   const branches = await getMetadataBranches();
-  const assignedBranch = findAssignedBranch(employee, branches);
 
   return {
     employee,
-    assignedBranch,
+    assignedBranch: findAssignedBranch(employee, branches),
   };
 }

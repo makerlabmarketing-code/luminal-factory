@@ -1,10 +1,10 @@
 import { supabase } from '@/lib/supabase';
+import type { Employee } from '@/lib/types/employee';
 import type {
   EditableWorkflowTask,
-  StaffEmployee,
   WorkflowDescription,
   WorkflowSetting,
-} from '@/lib/types/staff';
+} from '@/lib/types/workflow';
 import { getStaffEmployeeByToken } from '@/services/staffPortalService';
 
 const WORKFLOW_GROUP_NAME = 'PRODUCTION_WORKFLOW';
@@ -29,7 +29,7 @@ export function parseWorkflowDescription(description?: string | null): WorkflowD
 
 export async function getStaffTasksData(params: {
   token?: string | null;
-  workerData?: StaffEmployee | null;
+  workerData?: Employee | null;
 }): Promise<{
   workerName: string;
   workflowItems: WorkflowSetting[];

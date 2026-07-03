@@ -1,33 +1,26 @@
 import { supabase } from '@/lib/supabase';
-import type { FinancialLedgerEntry, StaffEmployee } from '@/lib/types/staff';
-import { getStaffEmployeeByToken } from '@/services/staffPortalService';
+import type { Employee } from '@/lib/types/employee';
+import type { Facility } from '@/lib/types/facility';
+import {
+  findAssignedBranch,
+  getMetadataBranches,
+  getStaffEmployeeByToken,
+} from '@/services/staffPortalService';
 
-export function formatCurrency(value: string): string {
-  if (!value) return '';
+export function getShiftWageByTitle(title?: string | null): number {
+  const formattedTitle = (title || '').trim().toUpperCase();
 
-  const onlyNumbers = value.replace(/[^0-9]/g, '');
+  if (formattedTitle === 'A1') return 150000;
 
-  return onlyNumbers.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return 100000;
 }
 
-export function parseCurrency(value: string): number {
-  if (!value) return 0;
-
-  return Number(value.replace(/,/g, ''));
-}
-
-export function getCurrentMonthPeriod(): string {
-  const now = new Date();
-
-  return `${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`;
-}
-
-export async function getStaffExpensesData(params: {
+export async function getStaffProfileData(params: {
   token?: string | null;
-  workerData?: StaffEmployee | null;
+  workerData?: Employee | null;
 }): Promise<{
-  employee: StaffEmployee | null;
-  expenses: FinancialLedgerEntry[];
+  employee: Employee | null;
+  assignedBranch: Facility | null;
 }> {
   let employee = params.workerData || null;
 
@@ -38,41 +31,32 @@ export async function getStaffExpensesData(params: {
   if (!employee) {
     return {
       employee: null,
-      expenses: [],
+      assignedBranch: null,
     };
   }
 
-  const { data, error } = await supabase
-    .from('financial_ledger')
-    .select('*')
-    .eq('requested_by', employee.full_name)
-    .order('id', { ascending: false });
-
-  if (error) throw error;
+  const branches = await getMetadataBranches();
 
   return {
     employee,
-    expenses: (data || []) as FinancialLedgerEntry[],
+    assignedBranch: findAssignedBranch(employee, branches),
   };
 }
 
-export async function submitStaffExpense(params: {
-  employee: StaffEmployee;
-  category: string;
-  amount: number;
-  billUrl: string;
+export async function updateStaffProfile(params: {
+  employeeId: number | string;
+  phone: string;
+  bankName: string;
+  bankAccountNumber: string;
 }): Promise<void> {
-  const { error } = await supabase.from('financial_ledger').insert([
-    {
-      type: 'HOAN_UNG',
-      category: params.category.trim(),
-      amount: params.amount,
-      bill_url: params.billUrl.trim(),
-      requested_by: params.employee.full_name,
-      is_paid: false,
-      month_period: getCurrentMonthPeriod(),
-    },
-  ]);
+  const { error } = await supabase
+    .from('employees')
+    .update({
+      phone: params.phone.trim(),
+      bank_name: params.bankName.trim(),
+      bank_account_number: params.bankAccountNumber.trim(),
+    })
+    .eq('id', params.employeeId);
 
   if (error) throw error;
 }
