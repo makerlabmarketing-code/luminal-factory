@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Banknote, ClipboardList, Clock, RefreshCcw, User } from 'lucide-react';
 import { StaffAttendanceContent } from '../attendance/AttendanceView';
@@ -20,6 +20,12 @@ export default function StaffPortalContent() {
   const [assignedBranch, setAssignedBranch] = useState<Facility | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<StaffPortalTab>('attendance');
+  const [visitedTabs, setVisitedTabs] = useState<Record<StaffPortalTab, boolean>>({
+    attendance: true,
+    tasks: false,
+    expenses: false,
+    profile: false,
+  });
 
   useEffect(() => {
     const loadPortalData = async () => {
@@ -43,6 +49,27 @@ export default function StaffPortalContent() {
     loadPortalData();
   }, [token]);
 
+  useEffect(() => {
+    setVisitedTabs((prev) =>
+      prev[activeTab]
+        ? prev
+        : {
+            ...prev,
+            [activeTab]: true,
+          }
+    );
+  }, [activeTab]);
+
+  const tabClasses = useMemo(
+    () => ({
+      attendance: activeTab === 'attendance' ? 'block' : 'hidden',
+      tasks: activeTab === 'tasks' ? 'block' : 'hidden',
+      expenses: activeTab === 'expenses' ? 'block' : 'hidden',
+      profile: activeTab === 'profile' ? 'block' : 'hidden',
+    }),
+    [activeTab]
+  );
+
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-950 flex justify-center items-center text-slate-400 text-xs font-mono">
@@ -65,21 +92,23 @@ export default function StaffPortalContent() {
         </div>
       </div>
 
-      {activeTab === 'attendance' && (
-        <StaffAttendanceContent token={token} workerData={worker} assignedBranchData={assignedBranch} />
-      )}
+      <div className={tabClasses.attendance}>
+        {visitedTabs.attendance && (
+          <StaffAttendanceContent token={token} workerData={worker} assignedBranchData={assignedBranch} />
+        )}
+      </div>
 
-      {activeTab === 'tasks' && (
-        <StaffTasksContent token={token} workerData={worker} />
-      )}
+      <div className={tabClasses.tasks}>
+        {visitedTabs.tasks && <StaffTasksContent token={token} workerData={worker} />}
+      </div>
 
-      {activeTab === 'expenses' && (
-        <StaffExpensesContent token={token} workerData={worker} />
-      )}
+      <div className={tabClasses.expenses}>
+        {visitedTabs.expenses && <StaffExpensesContent token={token} workerData={worker} />}
+      </div>
 
-      {activeTab === 'profile' && (
-        <StaffProfileContent token={token} workerData={worker} />
-      )}
+      <div className={tabClasses.profile}>
+        {visitedTabs.profile && <StaffProfileContent token={token} workerData={worker} />}
+      </div>
 
       <div className="fixed bottom-0 left-0 right-0 bg-slate-900/95 backdrop-blur-md border-t border-slate-800 px-2 py-3.5 z-50 flex justify-around items-center shadow-2xl text-[10px] font-bold">
         <button onClick={() => setActiveTab('attendance')} className={`flex flex-col items-center gap-1 transition-all duration-200 focus:outline-none cursor-pointer ${activeTab === 'attendance' ? 'text-blue-400 font-black' : 'text-slate-500'}`}>

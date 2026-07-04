@@ -2,6 +2,12 @@ import { supabase } from '@/lib/supabase';
 import type { Employee } from '@/lib/types/employee';
 import type { Facility } from '@/lib/types/facility';
 
+const metadataBranchesCache = new Map<string, Facility[]>();
+const portalDataCache = new Map<
+  string,
+  Promise<{ employee: Employee | null; assignedBranch: Facility | null }>
+>();
+
 export async function getStaffEmployeeByToken(token: string): Promise<Employee | null> {
   const { data, error } = await supabase
     .from('employees')
@@ -27,6 +33,13 @@ export async function getStaffEmployeeById(employeeId: number | string): Promise
 }
 
 export async function getMetadataBranches(): Promise<Facility[]> {
+  const cacheKey = 'default';
+  const cachedBranches = metadataBranchesCache.get(cacheKey);
+
+  if (cachedBranches) {
+    return cachedBranches;
+  }
+
   const { data, error } = await supabase
     .from('system_metadata')
     .select('data')
@@ -36,7 +49,11 @@ export async function getMetadataBranches(): Promise<Facility[]> {
   if (error) throw error;
 
   const payload = data?.data;
-  return Array.isArray(payload) ? (payload as Facility[]) : [];
+  const branches = Array.isArray(payload) ? (payload as Facility[]) : [];
+
+  metadataBranchesCache.set(cacheKey, branches);
+
+  return branches;
 }
 
 export function findAssignedBranch(employee: Employee, branches: Facility[]): Facility | null {
@@ -56,19 +73,31 @@ export async function getStaffPortalData(token: string): Promise<{
   employee: Employee | null;
   assignedBranch: Facility | null;
 }> {
-  const employee = await getStaffEmployeeByToken(token);
+  const cachedRequest = portalDataCache.get(token);
 
-  if (!employee) {
-    return {
-      employee: null,
-      assignedBranch: null,
-    };
+  if (cachedRequest) {
+    return cachedRequest;
   }
 
-  const branches = await getMetadataBranches();
+  const request = (async () => {
+    const employee = await getStaffEmployeeByToken(token);
 
-  return {
-    employee,
-    assignedBranch: findAssignedBranch(employee, branches),
-  };
+    if (!employee) {
+      return {
+        employee: null,
+        assignedBranch: null,
+      };
+    }
+
+    const branches = await getMetadataBranches();
+
+    return {
+      employee,
+      assignedBranch: findAssignedBranch(employee, branches),
+    };
+  })();
+
+  portalDataCache.set(token, request);
+
+  return request;
 }
