@@ -1,27 +1,14 @@
 import { supabase } from '@/lib/supabase';
 import type { Employee } from '@/lib/types/employee';
 import type { FinancialLedgerEntry } from '@/lib/types/finance';
+import {
+  formatCurrency,
+  getCurrentMonthPeriod,
+  parseCurrency,
+} from '@/services/financialService';
 import { getStaffEmployeeByToken } from '@/services/staffPortalService';
 
-export function formatCurrency(value: string): string {
-  if (!value) return '';
-
-  const onlyNumbers = value.replace(/[^0-9]/g, '');
-
-  return onlyNumbers.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-}
-
-export function parseCurrency(value: string): number {
-  if (!value) return 0;
-
-  return Number(value.replace(/,/g, ''));
-}
-
-export function getCurrentMonthPeriod(): string {
-  const now = new Date();
-
-  return `${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`;
-}
+export { formatCurrency, parseCurrency, getCurrentMonthPeriod };
 
 export async function getStaffExpensesData(params: {
   token?: string | null;

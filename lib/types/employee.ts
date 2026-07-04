@@ -1,7 +1,9 @@
 export interface Employee {
     id: number | string;
+    employee_id?: number | string | null;
     full_name: string;
     title?: string | null;
+    status?: string | null;
     qr_token?: string | null;
     branch?: string | null;
     branch_code?: string | null;

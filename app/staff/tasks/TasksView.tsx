@@ -48,8 +48,10 @@ export function StaffTasksContent({
   const { showToast } = useNotification();
   const searchParams = useSearchParams();
   const token = propsToken || searchParams.get('token');
+  const initialWorkerId = workerData?.employee_id || workerData?.id || null;
 
   const [workerName, setWorkerName] = useState(workerData?.full_name || '');
+  const [workerId, setWorkerId] = useState<number | string | null>(initialWorkerId);
   const [loading, setLoading] = useState(true);
   const [allWorkflowTasks, setAllWorkflowTasks] = useState<WorkflowSetting[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
@@ -69,6 +71,7 @@ export function StaffTasksContent({
         workerData,
       });
 
+      setWorkerId(tasksData.workerId);
       setWorkerName(tasksData.workerName);
       setAllWorkflowTasks(tasksData.workflowItems);
 
@@ -183,9 +186,10 @@ export function StaffTasksContent({
   const taskStats = useMemo(() => {
     return getTaskStats({
       workflowItems: allWorkflowTasks,
+      workerId,
       workerName,
     });
-  }, [allWorkflowTasks, workerName]);
+  }, [allWorkflowTasks, workerId, workerName]);
 
   if (loading) {
     return (
@@ -406,7 +410,14 @@ export function StaffTasksContent({
                             note: task.note || '',
                           };
 
-                          const isAssignedToMe = task.assignee === workerName;
+                          const isAssignedToMe =
+                            (workerId !== null &&
+                              workerId !== undefined &&
+                              task.assignee_id !== null &&
+                              task.assignee_id !== undefined &&
+                              String(task.assignee_id) === String(workerId)) ||
+                            task.assignee_name === workerName ||
+                            task.assignee === workerName;
 
                           return (
                             <div
@@ -432,7 +443,7 @@ export function StaffTasksContent({
                                           : 'text-slate-300'
                                       }
                                     >
-                                      {task.assignee} {isAssignedToMe && '(Bạn)'}
+                                      {task.assignee_name || task.assignee || 'Chua gan'} {isAssignedToMe && '(Bạn)'}
                                     </span>
                                   </p>
                                 </div>

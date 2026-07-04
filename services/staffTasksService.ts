@@ -1,4 +1,3 @@
-import { supabase } from '@/lib/supabase';
 import type { Employee } from '@/lib/types/employee';
 import type {
   EditableWorkflowTask,
@@ -6,8 +5,11 @@ import type {
   WorkflowSetting,
 } from '@/lib/types/workflow';
 import { getStaffEmployeeByToken } from '@/services/staffPortalService';
-
-const WORKFLOW_GROUP_NAME = 'PRODUCTION_WORKFLOW';
+import {
+  getWorkflowItems,
+  updateWorkflowProjectDriveLink,
+  updateWorkflowTask,
+} from '@/services/workflowService';
 
 export function parseWorkflowDescription(description?: string | null): WorkflowDescription {
   try {
@@ -31,6 +33,7 @@ export async function getStaffTasksData(params: {
   token?: string | null;
   workerData?: Employee | null;
 }): Promise<{
+  workerId: number | string | null;
   workerName: string;
   workflowItems: WorkflowSetting[];
 }> {
@@ -42,21 +45,18 @@ export async function getStaffTasksData(params: {
 
   if (!employee) {
     return {
+      workerId: null,
       workerName: '',
       workflowItems: [],
     };
   }
 
-  const { data, error } = await supabase
-    .from('system_settings')
-    .select('*')
-    .eq('group_name', WORKFLOW_GROUP_NAME);
-
-  if (error) throw error;
+  const data = await getWorkflowItems();
 
   return {
+    workerId: employee.employee_id || employee.id,
     workerName: employee.full_name,
-    workflowItems: (data || []) as WorkflowSetting[],
+    workflowItems: data,
   };
 }
 
@@ -109,6 +109,7 @@ export function groupWorkflowByProject(
 
 export function getTaskStats(params: {
   workflowItems: WorkflowSetting[];
+  workerId?: number | string | null;
   workerName: string;
 }): {
   total: number;
@@ -123,7 +124,15 @@ export function getTaskStats(params: {
     const parsed = parseWorkflowDescription(item.description);
 
     parsed.tasks_list?.forEach((task) => {
-      if (task.assignee !== params.workerName) return;
+      const matchesById =
+        params.workerId !== null &&
+        params.workerId !== undefined &&
+        task.assignee_id !== null &&
+        task.assignee_id !== undefined &&
+        String(task.assignee_id) === String(params.workerId);
+      const matchesByName = task.assignee === params.workerName || task.assignee_name === params.workerName;
+
+      if (!matchesById && !matchesByName) return;
 
       total += 1;
 
@@ -161,15 +170,18 @@ export async function updateStaffWorkflowTask(params: {
   };
 
   const updatedDescription = JSON.stringify(parsed);
+  const taskId = parsed.tasks_list[params.taskIndex].id;
 
-  const { error } = await supabase
-    .from('system_settings')
-    .update({
-      description: updatedDescription,
-    })
-    .eq('key', params.item.key);
+  if (!taskId) {
+    throw new Error('Khong tim thay ID dau viec can cap nhat.');
+  }
 
-  if (error) throw error;
+  await updateWorkflowTask({
+    taskId,
+    status: params.bufferedTask.status,
+    deadline: params.bufferedTask.deadline,
+    note: params.bufferedTask.note,
+  });
 
   return updatedDescription;
 }
@@ -178,29 +190,15 @@ export async function updateProjectDriveLink(params: {
   projectName: string;
   driveLink: string;
 }): Promise<void> {
-  const { data, error } = await supabase
-    .from('system_settings')
-    .select('*')
-    .eq('group_name', WORKFLOW_GROUP_NAME)
-    .like('config_name', `${params.projectName}%`);
-
-  if (error) throw error;
-
-  const phases = (data || []) as WorkflowSetting[];
-
-  await Promise.all(
-    phases.map(async (phase) => {
-      const parsed = parseWorkflowDescription(phase.description);
-      parsed.project_drive_link = params.driveLink;
-
-      const { error: updateError } = await supabase
-        .from('system_settings')
-        .update({
-          description: JSON.stringify(parsed),
-        })
-        .eq('key', phase.key);
-
-      if (updateError) throw updateError;
-    })
+  const phases = await getWorkflowItems();
+  const projectPhase = phases.find(
+    (phase) => phase.config_name?.split(' - ')[0] === params.projectName
   );
+
+  if (!projectPhase?.project_id) return;
+
+  await updateWorkflowProjectDriveLink({
+    projectId: projectPhase.project_id,
+    driveLink: params.driveLink,
+  });
 }

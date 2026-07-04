@@ -1,14 +1,41 @@
 // app/admin/tasks/page.tsx
 'use client';
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
 import { useNotification } from '@/component/NotificationContext';
+import type { Employee } from '@/lib/types/employee';
+import type {
+  WorkflowDescription,
+  WorkflowSetting,
+  WorkflowTask,
+} from '@/lib/types/workflow';
 import { ClipboardList, Plus, Trash2, Search, ChevronLeft, ChevronRight, X, Layers, Eye, Calendar, Save, ExternalLink, Activity, CheckSquare, RefreshCcw } from 'lucide-react';
+import {
+  findEmployeeByIdentifier,
+  findEmployeeByName,
+  getActiveEmployees,
+} from '@/services/employeeService';
+import {
+  createWorkflowProject,
+  deleteWorkflowProject,
+  getWorkflowItems,
+  updateWorkflowPhaseStatus,
+  updateWorkflowProjectDriveLink,
+  updateWorkflowTaskField,
+} from '@/services/workflowService';
+
+interface WorkflowFormTask extends WorkflowTask {
+  assignee_id?: number | string | null;
+}
+
+interface WorkflowFormPhase {
+  name: string;
+  tasks: WorkflowFormTask[];
+}
 
 export default function AdminTaskWorkflowDashboard() {
   const { showToast, showConfirm } = useNotification();
-  const [tasks, setTasks] = useState<any[]>([]);
-  const [employees, setEmployees] = useState<any[]>([]);
+  const [tasks, setTasks] = useState<WorkflowSetting[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -18,27 +45,20 @@ export default function AdminTaskWorkflowDashboard() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
   const [projectDeadline, setProjectDeadline] = useState('');
-  const [formPhases, setFormPhases] = useState<any[]>([]);
+  const [formPhases, setFormPhases] = useState<WorkflowFormPhase[]>([]);
 
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [activeProjectName, setActiveProjectName] = useState('');
-  const [activeProjectPhases, setActiveProjectPhases] = useState<any[]>([]);
+  const [activeProjectPhases, setActiveProjectPhases] = useState<WorkflowSetting[]>([]);
   const [driveLinkInput, setDriveLinkInput] = useState(''); 
 
   const loadData = async () => {
     setLoading(true);
     try {
-      const { data: tList, error: tErr } = await supabase
-        .from('system_settings')
-        .select('*')
-        .eq('group_name', 'PRODUCTION_WORKFLOW')
-        .order('key', { ascending: true });
-        
-      if (tErr) throw tErr;
+      const tList = await getWorkflowItems();
       setTasks(tList || []);
 
-      const { data: emps, error: eErr } = await supabase.from('employees').select('id, full_name, title').eq('status', 'ACTIVE');
-      if (eErr) throw eErr;
+      const emps = await getActiveEmployees();
       setEmployees(emps || []);
     } catch (e: any) {
       showToast('Lỗi tải dữ liệu', e.message, 'error');
@@ -56,12 +76,12 @@ export default function AdminTaskWorkflowDashboard() {
   const handleOpenAddModal = () => {
     setNewProjectName('');
     setProjectDeadline('');
-    setFormPhases([{ name: 'Giai đoạn 1', tasks: [{ name: '', assignee: '', deadline: '', note: '', status: 'TODO' }] }]);
+    setFormPhases([{ name: 'Giai đoạn 1', tasks: [{ name: '', assignee_id: '', deadline: '', note: '', status: 'TODO' }] }]);
     setShowAddModal(true);
   };
 
   const handleAddPhaseInForm = () => {
-    setFormPhases([...formPhases, { name: `Giai đoạn ${formPhases.length + 1}`, tasks: [{ name: '', assignee: '', deadline: '', note: '', status: 'TODO' }] }]);
+    setFormPhases([...formPhases, { name: `Giai đoạn ${formPhases.length + 1}`, tasks: [{ name: '', assignee_id: '', deadline: '', note: '', status: 'TODO' }] }]);
   };
 
   const handleRemovePhaseInForm = (pIdx: number) => {
@@ -72,7 +92,7 @@ export default function AdminTaskWorkflowDashboard() {
 
   const handleAddTaskInForm = (pIdx: number) => {
     const updated = [...formPhases];
-    updated[pIdx].tasks.push({ name: '', assignee: '', deadline: '', note: '', status: 'TODO' });
+    updated[pIdx].tasks.push({ name: '', assignee_id: '', deadline: '', note: '', status: 'TODO' });
     setFormPhases(updated);
   };
 
@@ -87,31 +107,32 @@ export default function AdminTaskWorkflowDashboard() {
     if (!projectDeadline) return showToast('Thiếu thời hạn', 'Vui lòng chọn ngày hạn dự án!', 'error');
 
     try {
-      const timestampId = Date.now();
-      const payloadArray = formPhases.map((phase, idx) => {
-        const validTasks = phase.tasks.filter((t: any) => t.name.trim() !== '').map((t: any) => ({
-          name: t.name.trim(),
-          assignee: t.assignee,
-          deadline: t.deadline,
-          note: t.note.trim(),
-          status: t.status || 'TODO'
-        }));
-        
-        return {
-          group_name: 'PRODUCTION_WORKFLOW',
-          config_name: `${newProjectName.trim()} - ${phase.name.trim() || `Giai đoạn ${idx + 1}`}`,
-          key: `TASK_${timestampId}_PHASE_${idx}`,
-          value: idx === 0 ? 'DOING' : 'TODO',
-          description: JSON.stringify({
-            project_drive_link: '', 
-            project_deadline: projectDeadline,
-            tasks_list: validTasks
-          })
-        };
-      });
+      await createWorkflowProject({
+        projectName: newProjectName,
+        projectDeadline,
+        phases: formPhases.map((phase) => {
+          const validTasks = phase.tasks
+            .filter((task) => task.name?.trim() !== '')
+            .map((task) => {
+              const matchedEmployee = findEmployeeByIdentifier(employees, task.assignee_id);
 
-      const { error } = await supabase.from('system_settings').insert(payloadArray);
-      if (error) throw error;
+              return {
+                name: task.name?.trim(),
+                assignee_id: matchedEmployee?.employee_id || matchedEmployee?.id || null,
+                assignee_name: matchedEmployee?.full_name || '',
+                assignee: matchedEmployee?.full_name || '',
+                deadline: task.deadline,
+                note: task.note?.trim() || '',
+                status: task.status || 'TODO',
+              };
+            });
+
+          return {
+            name: phase.name,
+            tasks: validTasks,
+          };
+        }),
+      });
 
       setShowAddModal(false);
       await loadData();
@@ -123,14 +144,16 @@ export default function AdminTaskWorkflowDashboard() {
 
   const handleUpdatePhaseStatus = async (taskKey: string, newStatus: string) => {
     try {
-      const { error } = await supabase.from('system_settings').update({ value: newStatus }).eq('key', taskKey);
-      if (error) throw error;
+      const targetPhase = activeProjectPhases.find(p => p.key === taskKey);
+      if (!targetPhase?.phase_id) throw new Error('Khong tim thay phase can cap nhat.');
+
+      await updateWorkflowPhaseStatus(targetPhase.phase_id, newStatus);
       
       setActiveProjectPhases(prev => prev.map(p => p.key === taskKey ? { ...p, value: newStatus } : p));
       showToast('Đã cập nhật', 'Trạng thái giai đoạn thay đổi thành công!', 'success');
       
-      const { data: tList } = await supabase.from('system_settings').select('*').eq('group_name', 'PRODUCTION_WORKFLOW').order('key', { ascending: true });
-      if (tList) setTasks(tList);
+      const tList = await getWorkflowItems();
+      setTasks(tList);
     } catch (e: any) { showToast('Lỗi', e.message, 'error'); }
   };
 
@@ -138,51 +161,85 @@ export default function AdminTaskWorkflowDashboard() {
     if (activeProjectPhases.length === 0) return;
     try {
       const cleanedLink = driveLinkInput.trim();
-      const updatePromises = activeProjectPhases.map(async (phase) => {
-        let currentJSON: any = { project_drive_link: '', project_deadline: '', tasks_list: [] };
-        try { currentJSON = JSON.parse(phase.description || '{}'); } catch {}
-        currentJSON.project_drive_link = cleanedLink;
-        return supabase.from('system_settings').update({ description: JSON.stringify(currentJSON) }).eq('key', phase.key);
-      });
+      const projectId = activeProjectPhases[0]?.project_id;
+      if (!projectId) throw new Error('Khong tim thay du an can cap nhat.');
 
-      await Promise.all(updatePromises);
+      await updateWorkflowProjectDriveLink({
+        projectId,
+        driveLink: cleanedLink,
+      });
       showToast('Thành công', 'Đã lưu link Google Drive tổng!', 'success');
       loadData();
       setShowDetailModal(false);
     } catch (e: any) { showToast('Lỗi', e.message, 'error'); }
   };
 
-  const handleUpdateNestedTaskInline = async (phaseKey: string, rawDescription: string, taskIdx: number, field: string, value: string) => {
+  const handleUpdateNestedTaskInline = async (
+    phaseKey: string,
+    rawDescription: string | null | undefined,
+    taskIdx: number,
+    field: 'assignee_id' | 'deadline' | 'note' | 'status',
+    value: string
+  ) => {
     try {
-      let currentJSON: any = { project_drive_link: '', project_deadline: '', tasks_list: [] };
-      try { currentJSON = JSON.parse(rawDescription || '{}'); } catch {}
-      currentJSON.tasks_list[taskIdx][field] = value;
+      let currentJSON: WorkflowDescription = { project_drive_link: '', project_deadline: '', tasks_list: [] };
+      try { currentJSON = JSON.parse(rawDescription || '{}') as WorkflowDescription; } catch {}
+      const taskId = currentJSON.tasks_list?.[taskIdx]?.id;
+      if (!taskId) throw new Error('Khong tim thay dau viec can cap nhat.');
+
+      const currentTask = currentJSON.tasks_list?.[taskIdx];
+      if (!currentTask) throw new Error('Khong tim thay dau viec can cap nhat.');
+
+      if (field === 'assignee_id') {
+        const matchedEmployee = findEmployeeByIdentifier(employees, value);
+        currentTask.assignee_id = matchedEmployee?.employee_id || matchedEmployee?.id || null;
+        currentTask.assignee_name = matchedEmployee?.full_name || '';
+        currentTask.assignee = matchedEmployee?.full_name || '';
+
+        await updateWorkflowTaskField({
+          taskId,
+          field: 'assignee_id',
+          value: currentTask.assignee_id || null,
+        });
+        await updateWorkflowTaskField({
+          taskId,
+          field: 'assignee_name',
+          value: currentTask.assignee_name || '',
+        });
+      } else {
+        currentTask[field] = value;
+        await updateWorkflowTaskField({
+          taskId,
+          field,
+          value,
+        });
+      }
 
       const updatedDescription = JSON.stringify(currentJSON);
-      const { error } = await supabase.from('system_settings').update({ description: updatedDescription }).eq('key', phaseKey);
-      if (error) throw error;
       
       setActiveProjectPhases(prev => prev.map(p => p.key === phaseKey ? { ...p, description: updatedDescription } : p));
       
-      const { data: updatedList } = await supabase.from('system_settings').select('*').eq('group_name', 'PRODUCTION_WORKFLOW').order('key', { ascending: true });
-      if (updatedList) setTasks(updatedList);
+      const updatedList = await getWorkflowItems();
+      setTasks(updatedList);
     } catch (e: any) { showToast('Lỗi', e.message, 'error'); }
   };
 
-  const handleDeleteProjectGroup = (configNamePrefix: string) => {
+  const handleDeleteProjectGroup = (configNamePrefix?: string | null) => {
     if (!configNamePrefix) return;
     const shortName = configNamePrefix.split(' - ')[0]; 
     showConfirm('Xóa dự án', `Sếp có chắc chắn xóa toàn bộ dự án [${shortName}]?`, async () => {
       try {
-        const { error } = await supabase.from('system_settings').delete().like('config_name', `${shortName}%`);
-        if (error) throw error;
+        const targetProjectId = tasks.find(t => t.config_name?.split(' - ')[0] === shortName)?.project_id;
+        if (!targetProjectId) throw new Error('Khong tim thay du an can xoa.');
+
+        await deleteWorkflowProject(targetProjectId);
         showToast('Đã xóa', 'Dự án đã được dọn sạch.', 'info');
         loadData();
       } catch (e: any) { showToast('Lỗi', e.message, 'error'); }
     });
   };
 
-  const projectGroupsMap: { [key: string]: any[] } = {};
+  const projectGroupsMap: Record<string, WorkflowSetting[]> = {};
   tasks.forEach(t => {
     if (!t.config_name) return;
     const parts = t.config_name.split(' - ');
@@ -197,7 +254,7 @@ export default function AdminTaskWorkflowDashboard() {
   let doneProjectsCount = 0;
 
   uniqueProjectNamesAll.forEach(pName => {
-    const phases = projectGroupsMap[pName];
+      const phases = projectGroupsMap[pName];
     if (phases.every(ph => ph.value === 'DONE')) doneProjectsCount++;
     else doingProjectsCount++;
   });
@@ -310,7 +367,7 @@ export default function AdminTaskWorkflowDashboard() {
                       </button>
                     </td>
                     <td className="p-4 text-center">
-                      <button onClick={() => handleDeleteProjectGroup(projectPhases[0]?.config_name)} className="text-slate-600 hover:text-red-400 transition cursor-pointer"><Trash2 className="w-3.5 h-3.5"/></button>
+                      <button onClick={() => handleDeleteProjectGroup(projectPhases[0]?.config_name || '')} className="text-slate-600 hover:text-red-400 transition cursor-pointer"><Trash2 className="w-3.5 h-3.5"/></button>
                     </td>
                   </tr>
                 );
@@ -350,8 +407,8 @@ export default function AdminTaskWorkflowDashboard() {
 
             <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-1">
               {activeProjectPhases.map((phase, pIdx) => {
-                let currentJSON: any = { tasks_list: [] };
-                try { currentJSON = JSON.parse(phase.description || '{}'); } catch {}
+                let currentJSON: WorkflowDescription = { tasks_list: [] };
+                try { currentJSON = JSON.parse(phase.description || '{}') as WorkflowDescription; } catch {}
 
                 return (
                   <div key={phase.key} className="bg-slate-950 p-3 border border-slate-850 rounded-xl space-y-2.5">
@@ -371,16 +428,20 @@ export default function AdminTaskWorkflowDashboard() {
                     </div>
 
                     <div className="space-y-2">
-                      {currentJSON.tasks_list?.map((task: any, tIdx: number) => (
+                      {currentJSON.tasks_list?.map((task: WorkflowTask, tIdx: number) => (
                         <div key={tIdx} className="bg-slate-900 border border-slate-850 p-3 rounded-xl grid grid-cols-1 md:grid-cols-4 gap-3 items-center text-[11px]">
                           <div className="md:col-span-2 space-y-1">
                             <p className="font-bold text-slate-200">⚙️ {task.name}</p>
                             <input type="text" className="w-full bg-slate-950 border border-slate-850 rounded px-2 py-1 text-[10px] text-slate-300 focus:outline-none" placeholder="Ghi chú công việc..." value={task.note || ''} onChange={(e) => handleUpdateNestedTaskInline(phase.key, phase.description, tIdx, 'note', e.target.value)} />
                           </div>
                           <div className="space-y-1">
-                            <select className="w-full bg-slate-950 border border-slate-800 rounded p-1 text-slate-300 cursor-pointer" value={task.assignee || ''} onChange={(e) => handleUpdateNestedTaskInline(phase.key, phase.description, tIdx, 'assignee', e.target.value)}>
+                            <select
+                              className="w-full bg-slate-950 border border-slate-800 rounded p-1 text-slate-300 cursor-pointer"
+                              value={task.assignee_id || findEmployeeByName(employees, task.assignee_name || task.assignee)?.id || ''}
+                              onChange={(e) => handleUpdateNestedTaskInline(phase.key, phase.description, tIdx, 'assignee_id', e.target.value)}
+                            >
                               <option value="">Gán thợ...</option>
-                              {employees.map(emp => <option key={emp.id} value={emp.full_name}>{emp.full_name}</option>)}
+                              {employees.map(emp => <option key={emp.id} value={emp.employee_id || emp.id}>{emp.full_name}</option>)}
                             </select>
                             <input type="datetime-local" className="w-full bg-slate-950 border border-slate-800 rounded p-1 text-amber-400 text-[10px] cursor-pointer" value={task.deadline || ''} onChange={(e) => handleUpdateNestedTaskInline(phase.key, phase.description, tIdx, 'deadline', e.target.value)} />
                           </div>
@@ -435,10 +496,10 @@ export default function AdminTaskWorkflowDashboard() {
                   </div>
                   
                   <div className="pl-3 border-l border-slate-800 space-y-2">
-                    {p.tasks?.map((t: any, tIdx: number) => (
+                    {p.tasks?.map((t: WorkflowFormTask, tIdx: number) => (
                       <div key={tIdx} className="flex flex-col sm:flex-row gap-2 p-2 bg-slate-950 rounded-lg border border-slate-850 items-center">
                         <input type="text" className="flex-1 bg-slate-900 border border-slate-800 p-1.5 rounded text-slate-200 focus:outline-none text-xs" placeholder="Tên công việc con..." value={t.name} onChange={(e) => { const n = [...formPhases]; n[pIdx].tasks[tIdx].name = e.target.value; setFormPhases(n); }} />
-                        <select className="bg-slate-900 border border-slate-800 p-1.5 rounded text-slate-400 focus:outline-none text-xs cursor-pointer" value={t.assignee} onChange={(e) => { const n = [...formPhases]; n[pIdx].tasks[tIdx].assignee = e.target.value; setFormPhases(n); }}><option value="">Gán thợ...</option>{employees.map(e => <option key={e.id} value={e.full_name}>{e.full_name}</option>)}</select>
+                        <select className="bg-slate-900 border border-slate-800 p-1.5 rounded text-slate-400 focus:outline-none text-xs cursor-pointer" value={t.assignee_id || ''} onChange={(e) => { const n = [...formPhases]; n[pIdx].tasks[tIdx].assignee_id = e.target.value; setFormPhases(n); }}><option value="">Gán thợ...</option>{employees.map(e => <option key={e.id} value={e.employee_id || e.id}>{e.full_name}</option>)}</select>
                         <input type="datetime-local" className="bg-slate-900 border border-slate-800 p-1.5 rounded text-amber-400 font-mono text-xs cursor-pointer" value={t.deadline} onChange={(e) => { const n = [...formPhases]; n[pIdx].tasks[tIdx].deadline = e.target.value; setFormPhases(n); }} />
                         <button type="button" onClick={() => handleRemoveTaskInForm(pIdx, tIdx)} className="text-slate-500 hover:text-red-400 cursor-pointer"><Trash2 className="w-4 h-4"/></button>
                       </div>
