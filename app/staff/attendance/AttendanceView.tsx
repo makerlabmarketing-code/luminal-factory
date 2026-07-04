@@ -67,6 +67,10 @@ export function StaffAttendanceContent({
     });
   };
 
+  const resolveBranchName = (branch?: FacilityType) => {
+    return branch?.facility_name || branch?.name || 'Chưa gán cơ sở';
+  };
+
   const loadInitialShiftStatus = async (currentWorker: Employee) => {
     try {
       const todayStr = new Date().toLocaleDateString('en-CA');
@@ -147,7 +151,7 @@ export function StaffAttendanceContent({
           const { data: facs } = await supabase.from('facilities').select('*');
           const matchedBranch = findMatchedBranch(finalWorker, (facs || []) as FacilityType[]);
 
-          setLocalBranchName(matchedBranch ? matchedBranch.facility_name : 'Chưa gán cơ sở');
+          setLocalBranchName(resolveBranchName(matchedBranch));
         } catch {
           setLocalBranchName('Lỗi đồng bộ chi nhánh');
         }
@@ -207,7 +211,7 @@ export function StaffAttendanceContent({
       const activeWorker = ((freshEmp as Employee) || worker) as Employee;
       const matchedBranch = findMatchedBranch(activeWorker, (facs || []) as FacilityType[]);
 
-      setLocalBranchName(matchedBranch ? matchedBranch.facility_name : 'Chưa gán cơ sở');
+      setLocalBranchName(resolveBranchName(matchedBranch));
 
       if (!matchedBranch) {
         showToast(
