@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useNotification } from '@/component/NotificationContext';
 import { Briefcase, RefreshCcw, ShieldCheck } from 'lucide-react';
-import type { StaffBranch, StaffEmployee } from '@/lib/types/staff';
+import type { Facility } from '@/lib/types/facility';
+import type { Employee } from '@/lib/types/employee';
 import {
   getShiftWageByTitle,
   getStaffProfileData,
@@ -13,7 +14,7 @@ import {
 
 interface StaffProfileContentProps {
   token?: string | null;
-  workerData?: StaffEmployee | null;
+  workerData?: Employee | null;
 }
 
 export function StaffProfileContent({
@@ -24,8 +25,8 @@ export function StaffProfileContent({
   const searchParams = useSearchParams();
   const token = propsToken || searchParams.get('token');
 
-  const [worker, setWorker] = useState<StaffEmployee | null>(workerData || null);
-  const [assignedBranch, setAssignedBranch] = useState<StaffBranch | null>(null);
+  const [worker, setWorker] = useState<Employee | null>(workerData || null);
+  const [assignedBranch, setAssignedBranch] = useState<Facility | null>(null);
   const [loading, setLoading] = useState(!workerData);
 
   const [profilePhone, setProfilePhone] = useState('');

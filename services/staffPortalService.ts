@@ -35,7 +35,8 @@ export async function getMetadataBranches(): Promise<Facility[]> {
 
   if (error) throw error;
 
-  return Array.isArray(data?.data) ? (data.data as Facility[]) : [];
+  const payload = data?.data;
+  return Array.isArray(payload) ? (payload as Facility[]) : [];
 }
 
 export function findAssignedBranch(employee: Employee, branches: Facility[]): Facility | null {

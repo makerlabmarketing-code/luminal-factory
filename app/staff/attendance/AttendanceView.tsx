@@ -6,28 +6,13 @@ import { supabase } from '@/lib/supabase';
 import { useNotification } from '@/component/NotificationContext';
 import { Power, RefreshCcw, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { calculateHoursFromStrings, calculateSalary } from '@/services/payrollService';
-import type { Facility } from '@/lib/types/facility';
+import type { Employee } from '@/lib/types/employee';
+import type { Facility as FacilityType } from '@/lib/types/facility';
 
 interface AttendanceViewProps {
   token?: string | null;
   workerData?: Employee | null;
-  assignedBranchData?: Facility | null;
-}
-
-interface Employee {
-  id: number | string;
-  full_name: string;
-  qr_token?: string | null;
-  branch_code?: string | null;
-  hourly_rate?: number | string | null;
-}
-
-interface Facility {
-  id: number | string;
-  facility_name: string;
-  lat: number | string;
-  lng: number | string;
-  radius: number | string;
+  assignedBranchData?: FacilityType | null;
 }
 
 interface AttendanceRecord {
@@ -70,8 +55,8 @@ export function StaffAttendanceContent({
 
   const findMatchedBranch = (
     workerObj: Employee,
-    branchList: Facility[]
-  ): Facility | undefined => {
+    branchList: FacilityType[]
+  ): FacilityType | undefined => {
     return branchList.find((branch) => {
       if (String(workerObj.branch_code) === String(branch.id)) return true;
 
@@ -160,7 +145,7 @@ export function StaffAttendanceContent({
 
         try {
           const { data: facs } = await supabase.from('facilities').select('*');
-          const matchedBranch = findMatchedBranch(finalWorker, (facs || []) as Facility[]);
+          const matchedBranch = findMatchedBranch(finalWorker, (facs || []) as FacilityType[]);
 
           setLocalBranchName(matchedBranch ? matchedBranch.facility_name : 'Chưa gán cơ sở');
         } catch {
@@ -220,7 +205,7 @@ export function StaffAttendanceContent({
         .maybeSingle();
 
       const activeWorker = ((freshEmp as Employee) || worker) as Employee;
-      const matchedBranch = findMatchedBranch(activeWorker, (facs || []) as Facility[]);
+      const matchedBranch = findMatchedBranch(activeWorker, (facs || []) as FacilityType[]);
 
       setLocalBranchName(matchedBranch ? matchedBranch.facility_name : 'Chưa gán cơ sở');
 

@@ -12,7 +12,8 @@ import {
   RefreshCcw,
   Search,
 } from 'lucide-react';
-import type { FinancialLedgerEntry, StaffEmployee } from '@/lib/types/staff';
+import type { FinancialLedgerEntry } from '@/lib/types/finance';
+import type { Employee } from '@/lib/types/employee';
 import {
   formatCurrency,
   getStaffExpensesData,
@@ -22,7 +23,7 @@ import {
 
 interface StaffExpensesContentProps {
   token?: string | null;
-  workerData?: StaffEmployee | null;
+  workerData?: Employee | null;
 }
 
 const ITEMS_PER_PAGE = 10;
@@ -36,7 +37,7 @@ export function StaffExpensesContent({
   const token = propsToken || searchParams.get('token');
 
   const [expenses, setExpenses] = useState<FinancialLedgerEntry[]>([]);
-  const [worker, setWorker] = useState<StaffEmployee | null>(workerData || null);
+  const [worker, setWorker] = useState<Employee | null>(workerData || null);
   const [loading, setLoading] = useState(!workerData);
 
   const [expCategory, setExpCategory] = useState('');

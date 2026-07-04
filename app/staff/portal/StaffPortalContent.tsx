@@ -9,6 +9,7 @@ import { StaffExpensesContent } from '../expenses/ExpensesView';
 import { StaffProfileContent } from '../profile/ProfileView';
 import { getStaffPortalData } from '@/services/staffPortalService';
 import type { StaffPortalTab } from '@/lib/types/staff';
+import type { Employee } from '@/lib/types/employee';
 import type { Facility } from '@/lib/types/facility';
 
 export default function StaffPortalContent() {
