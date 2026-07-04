@@ -98,7 +98,7 @@ export async function checkOutAttendance(params: {
 }
 
 export async function updateAttendanceRecordTime(params: {
-  recordId: number;
+  recordId: number | string;
   checkIn: string;
   checkOut: string;
   hourlyRate: number;
@@ -155,7 +155,7 @@ export async function upsertAttendanceRecord(params: {
   if (error) throw error;
 }
 
-export async function deleteAttendanceRecord(recordId: number): Promise<void> {
+export async function deleteAttendanceRecord(recordId: number | string): Promise<void> {
   const { error } = await supabase.from('attendance').delete().eq('id', recordId);
   if (error) throw error;
 }

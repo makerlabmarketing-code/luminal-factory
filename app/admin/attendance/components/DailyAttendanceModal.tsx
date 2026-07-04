@@ -30,6 +30,10 @@ interface EditRow {
   check_out: string;
 }
 
+function getRecordKey(recordId: number | string): string {
+  return String(recordId);
+}
+
 export default function DailyAttendanceModal({
   isOpen,
   dateStr,
@@ -42,7 +46,7 @@ export default function DailyAttendanceModal({
   showToast,
   showConfirm,
 }: DailyAttendanceModalProps) {
-  const [editRows, setEditRows] = useState<Record<number, EditRow>>({});
+  const [editRows, setEditRows] = useState<Record<string, EditRow>>({});
   const [newShift, setNewShift] = useState('');
   const [newIn, setNewIn] = useState('');
   const [newOut, setNewOut] = useState('');
@@ -61,10 +65,10 @@ export default function DailyAttendanceModal({
   useEffect(() => {
     if (!isOpen) return;
 
-    const initialEdits: Record<number, EditRow> = {};
+    const initialEdits: Record<string, EditRow> = {};
 
     myRecords.forEach((record) => {
-      initialEdits[record.id] = {
+      initialEdits[getRecordKey(record.id)] = {
         check_in: record.check_in ? record.check_in.substring(0, 5) : '',
         check_out: record.check_out ? record.check_out.substring(0, 5) : '',
       };
@@ -78,11 +82,11 @@ export default function DailyAttendanceModal({
 
   if (!isOpen || !dateStr) return null;
 
-  const handleUpdateRecord = async (recordId: number) => {
+  const handleUpdateRecord = async (recordId: number | string) => {
     setIsSubmitting(true);
 
     try {
-      const rowData = editRows[recordId];
+      const rowData = editRows[getRecordKey(recordId)];
 
       if (!rowData) {
         showToast('Thiếu dữ liệu', 'Không tìm thấy dòng cần cập nhật.', 'error');
@@ -106,7 +110,7 @@ export default function DailyAttendanceModal({
     }
   };
 
-  const handleDeleteRecord = (recordId: number, shiftName: string) => {
+  const handleDeleteRecord = (recordId: number | string, shiftName: string) => {
     showConfirm('Xác nhận xóa', `Bạn có chắc chắn muốn xóa bản ghi [${shiftName}] này không?`, async () => {
       setIsSubmitting(true);
 
@@ -236,12 +240,12 @@ export default function DailyAttendanceModal({
                         <input
                           type="time"
                           style={{ colorScheme: 'dark' }}
-                          value={editRows[record.id]?.check_in || ''}
+                          value={editRows[getRecordKey(record.id)]?.check_in || ''}
                           onChange={(event) =>
                             setEditRows((prev) => ({
                               ...prev,
-                              [record.id]: {
-                                ...prev[record.id],
+                              [getRecordKey(record.id)]: {
+                                ...prev[getRecordKey(record.id)],
                                 check_in: event.target.value,
                               },
                             }))
@@ -257,12 +261,12 @@ export default function DailyAttendanceModal({
                         <input
                           type="time"
                           style={{ colorScheme: 'dark' }}
-                          value={editRows[record.id]?.check_out || ''}
+                          value={editRows[getRecordKey(record.id)]?.check_out || ''}
                           onChange={(event) =>
                             setEditRows((prev) => ({
                               ...prev,
-                              [record.id]: {
-                                ...prev[record.id],
+                              [getRecordKey(record.id)]: {
+                                ...prev[getRecordKey(record.id)],
                                 check_out: event.target.value,
                               },
                             }))
