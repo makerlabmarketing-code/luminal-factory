@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase';
 import { useNotification } from '@/component/NotificationContext';
 import { Power, RefreshCcw, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { calculateHoursFromStrings, calculateSalary } from '@/services/payrollService';
+import type { AttendanceRecord } from '@/lib/types/attendance';
 import type { Employee } from '@/lib/types/employee';
 import type { Facility as FacilityType } from '@/lib/types/facility';
 
@@ -13,19 +14,6 @@ interface AttendanceViewProps {
   token?: string | null;
   workerData?: Employee | null;
   assignedBranchData?: FacilityType | null;
-}
-
-interface AttendanceRecord {
-  id: number | string;
-  employee_id: number | string;
-  employee_name?: string | null;
-  work_date: string;
-  check_in?: string | null;
-  check_out?: string | null;
-  shift_name: string;
-  status?: string | null;
-  total_hours?: number | string | null;
-  total_salary?: number | string | null;
 }
 
 export function StaffAttendanceContent({

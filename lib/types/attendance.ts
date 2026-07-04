@@ -5,8 +5,8 @@ export interface Shift {
     end_time?: string | null;
   }
   
-  export interface AttendanceRecord {
-    id: number;
+export interface AttendanceRecord {
+    id: number | string;
     employee_id: number | string;
     employee_name?: string | null;
     work_date: string;

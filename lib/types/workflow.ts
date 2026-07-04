@@ -1,10 +1,13 @@
+export type WorkflowTaskStatus = 'TODO' | 'DOING' | 'DONE' | string;
+
 export interface WorkflowTask {
   id?: number;
+  phase_id?: number | null;
   name?: string;
   assignee?: string;
   assignee_id?: number | string | null;
   assignee_name?: string;
-  status?: 'TODO' | 'DOING' | 'DONE' | string;
+  status?: WorkflowTaskStatus;
   deadline?: string;
   note?: string;
 }
@@ -33,27 +36,26 @@ export interface EditableWorkflowTask {
   note: string;
 }
 
-export interface WorkflowProjectRow {
+export interface WorkflowProject {
   id: number;
   name: string;
   project_deadline?: string | null;
   drive_link?: string | null;
-  phases?: WorkflowPhaseRow[];
+  phases?: WorkflowPhase[];
 }
 
-export interface WorkflowPhaseRow {
+export interface WorkflowPhase {
   id: number;
   project_id: number;
   name: string;
   order_index?: number | null;
   status?: string | null;
-  tasks?: WorkflowTaskRow[];
+  tasks?: WorkflowTask[];
 }
 
-export interface WorkflowTaskRow extends WorkflowTask {
-  id: number;
-  phase_id: number;
-}
+export type WorkflowProjectRow = WorkflowProject;
+export type WorkflowPhaseRow = WorkflowPhase;
+export type WorkflowTaskRow = WorkflowTask;
 
 export interface WorkflowProjectInsertInput {
   projectName: string;

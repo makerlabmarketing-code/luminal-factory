@@ -1,13 +1,13 @@
 import type {
+  WorkflowPhase,
   WorkflowPhaseFormInput,
-  WorkflowPhaseRow,
+  WorkflowProject,
   WorkflowProjectInsertInput,
-  WorkflowProjectRow,
   WorkflowSetting,
 } from '@/lib/types/workflow';
 import { workflowRepository } from '@/services/repositories/workflowRepository';
 
-function toWorkflowSetting(project: WorkflowProjectRow, phase: WorkflowPhaseRow): WorkflowSetting {
+function toWorkflowSetting(project: WorkflowProject, phase: WorkflowPhase): WorkflowSetting {
   const orderIndex = phase.order_index ?? 0;
 
   return {
@@ -37,10 +37,10 @@ function toWorkflowSetting(project: WorkflowProjectRow, phase: WorkflowPhaseRow)
 }
 
 function attachTasksToPhases(
-  projects: WorkflowProjectRow[],
-  phases: WorkflowPhaseRow[]
-): WorkflowPhaseRow[] {
-  const phasesByProjectId = phases.reduce<Record<number, WorkflowPhaseRow[]>>((groups, phase) => {
+  projects: WorkflowProject[],
+  phases: WorkflowPhase[]
+): WorkflowPhase[] {
+  const phasesByProjectId = phases.reduce<Record<number, WorkflowPhase[]>>((groups, phase) => {
     if (!groups[phase.project_id]) groups[phase.project_id] = [];
     groups[phase.project_id].push(phase);
     return groups;

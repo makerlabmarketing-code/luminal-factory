@@ -7,12 +7,21 @@ import MonthPicker from '@/component/MonthPicker';
 import DailyAttendanceModal from './components/DailyAttendanceModal';
 import { Calendar as CalendarIcon, Clock, RefreshCcw, LayoutGrid, Banknote, CreditCard, User } from 'lucide-react';
 import { calculateHoursFromStrings, calculateSalary } from '@/services/payrollService';
+import type { AttendanceRecord, Shift } from '@/lib/types/attendance';
+import type { Employee } from '@/lib/types/employee';
+
+interface SalaryMetadataItem {
+  key?: string | null;
+  level?: string | null;
+  value?: number | string | null;
+  rate?: number | string | null;
+}
 
 export default function AdminAttendanceManagement() {
   const { showToast, showConfirm } = useNotification();
-  const [employees, setEmployees] = useState<any[]>([]);
-  const [shifts, setShifts] = useState<any[]>([]);
-  const [attendanceRecords, setAttendanceRecords] = useState<any[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [shifts, setShifts] = useState<Shift[]>([]);
+  const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
   const [salaryMetadata, setSalaryMetadata] = useState<any[]>([]); // Lưu trữ danh mục cấu trúc lương động từ DB
   const [loading, setLoading] = useState(true);
 

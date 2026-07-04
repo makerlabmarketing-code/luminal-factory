@@ -1,8 +1,8 @@
 import { supabase } from '@/lib/supabase';
 import type {
-  WorkflowPhaseRow,
-  WorkflowProjectRow,
-  WorkflowTaskRow,
+  WorkflowPhase,
+  WorkflowProject,
+  WorkflowTask,
 } from '@/lib/types/workflow';
 
 type GenericRow = Record<string, unknown>;
@@ -31,7 +31,7 @@ function pickFirstNumber(row: GenericRow, keys: string[]): number | null {
   return null;
 }
 
-export function normalizeProjectRow(row: GenericRow): WorkflowProjectRow | null {
+export function normalizeProjectRow(row: GenericRow): WorkflowProject | null {
   const id = pickFirstNumber(row, ['id']);
   if (id === null) return null;
 
@@ -43,7 +43,7 @@ export function normalizeProjectRow(row: GenericRow): WorkflowProjectRow | null 
   };
 }
 
-export function normalizePhaseRow(row: GenericRow): WorkflowPhaseRow | null {
+export function normalizePhaseRow(row: GenericRow): WorkflowPhase | null {
   const id = pickFirstNumber(row, ['id']);
   const projectId = pickFirstNumber(row, ['project_id']);
   if (id === null || projectId === null) return null;
@@ -57,7 +57,7 @@ export function normalizePhaseRow(row: GenericRow): WorkflowPhaseRow | null {
   };
 }
 
-export function normalizeTaskRow(row: GenericRow): WorkflowTaskRow | null {
+export function normalizeTaskRow(row: GenericRow): WorkflowTask | null {
   const id = pickFirstNumber(row, ['id']);
   const phaseId = pickFirstNumber(row, ['phase_id']);
   if (id === null || phaseId === null) return null;
@@ -95,16 +95,16 @@ async function tryUpdateById(
 }
 
 export class WorkflowRepository {
-  async listProjects(): Promise<WorkflowProjectRow[]> {
+  async listProjects(): Promise<WorkflowProject[]> {
     const { data, error } = await supabase.from('projects').select('*').order('id', { ascending: false });
     if (error) throw error;
 
     return (data || [])
       .map((row) => normalizeProjectRow(row as GenericRow))
-      .filter((row): row is WorkflowProjectRow => row !== null);
+      .filter((row): row is WorkflowProject => row !== null);
   }
 
-  async listPhasesByProjectIds(projectIds: number[]): Promise<WorkflowPhaseRow[]> {
+  async listPhasesByProjectIds(projectIds: number[]): Promise<WorkflowPhase[]> {
     if (projectIds.length === 0) return [];
 
     const { data, error } = await supabase
@@ -117,10 +117,10 @@ export class WorkflowRepository {
 
     return (data || [])
       .map((row) => normalizePhaseRow(row as GenericRow))
-      .filter((row): row is WorkflowPhaseRow => row !== null);
+      .filter((row): row is WorkflowPhase => row !== null);
   }
 
-  async listTasksByPhaseIds(phaseIds: number[]): Promise<WorkflowTaskRow[]> {
+  async listTasksByPhaseIds(phaseIds: number[]): Promise<WorkflowTask[]> {
     if (phaseIds.length === 0) return [];
 
     const { data, error } = await supabase
@@ -133,7 +133,7 @@ export class WorkflowRepository {
 
     return (data || [])
       .map((row) => normalizeTaskRow(row as GenericRow))
-      .filter((row): row is WorkflowTaskRow => row !== null);
+      .filter((row): row is WorkflowTask => row !== null);
   }
 
   async insertProject(params: {
