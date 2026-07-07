@@ -138,6 +138,11 @@ export default function DailyAttendanceModal({
       return;
     }
 
+    if (!newIn || !newOut) {
+      showToast('Thiếu dữ liệu', 'Vui lòng nhập đủ giờ vào và giờ ra.', 'error');
+      return;
+    }
+
     const duplicated = hasDuplicatedShift({
       records: existingRecords,
       employeeId: currentEmployee.id,

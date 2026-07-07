@@ -12,6 +12,11 @@ export function normalizeTimeValue(value: string | null | undefined): string | n
   return value.length === 5 ? `${value}:00` : value;
 }
 
+export function calculateShiftUnitsFromHours(hours: number): number {
+  if (hours <= 0) return 0;
+  return Math.ceil(hours / 3);
+}
+
 export function mergeAttendanceRecords(records: AttendanceRecord[]): AttendanceRecord[] {
   const mergedMap = new Map<string, AttendanceRecord>();
 
@@ -118,7 +123,29 @@ export async function checkInAttendance(params: {
   shiftName: string;
   checkIn: string;
 }): Promise<void> {
-  const { error } = await supabase.from('attendance').upsert(
+  const existingRecord = await getAttendanceRecordByShift({
+    employeeId: params.employee.id,
+    workDate: params.workDate,
+    shiftName: params.shiftName,
+  });
+
+  if (existingRecord) {
+    if (existingRecord.check_in) return;
+
+    const { error } = await supabase
+      .from('attendance')
+      .update({
+        employee_name: params.employee.full_name,
+        check_in: normalizeTimeValue(params.checkIn),
+        status: 'PRESENT',
+      })
+      .eq('id', existingRecord.id);
+
+    if (error) throw error;
+    return;
+  }
+
+  const { error } = await supabase.from('attendance').insert([
     {
       employee_id: params.employee.id,
       employee_name: params.employee.full_name,
@@ -127,11 +154,7 @@ export async function checkInAttendance(params: {
       check_in: normalizeTimeValue(params.checkIn),
       status: 'PRESENT',
     },
-    {
-      onConflict: 'employee_id,work_date,shift_name',
-      ignoreDuplicates: true,
-    }
-  );
+  ]);
 
   if (error) throw error;
 }
@@ -196,7 +219,30 @@ export async function upsertAttendanceRecord(params: {
   const totalHours = calculateHoursFromStrings(timeIn, timeOut);
   const totalSalary = calculateSalary(totalHours, params.hourlyRate);
 
-  const { error } = await supabase.from('attendance').upsert(
+  const existingRecord = await getAttendanceRecordByShift({
+    employeeId: params.employee.id,
+    workDate: params.workDate,
+    shiftName: params.shiftName,
+  });
+
+  if (existingRecord) {
+    const { error } = await supabase
+      .from('attendance')
+      .update({
+        employee_name: params.employee.full_name,
+        check_in: timeIn,
+        check_out: timeOut,
+        total_hours: totalHours,
+        total_salary: totalSalary,
+        status: 'PRESENT',
+      })
+      .eq('id', existingRecord.id);
+
+    if (error) throw error;
+    return;
+  }
+
+  const { error } = await supabase.from('attendance').insert([
     {
       employee_id: params.employee.id,
       employee_name: params.employee.full_name,
@@ -208,10 +254,7 @@ export async function upsertAttendanceRecord(params: {
       total_salary: totalSalary,
       status: 'PRESENT',
     },
-    {
-      onConflict: 'employee_id,work_date,shift_name',
-    }
-  );
+  ]);
 
   if (error) throw error;
 }

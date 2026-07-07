@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase';
 import { useNotification } from '@/component/NotificationContext';
 import { Power, RefreshCcw, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { calculateHoursFromStrings, calculateSalary } from '@/services/payrollService';
+import { checkInAttendance } from '@/services/attendanceService';
 import type { AttendanceRecord } from '@/lib/types/attendance';
 import type { Employee } from '@/lib/types/employee';
 import type { Facility as FacilityType } from '@/lib/types/facility';
@@ -288,22 +289,12 @@ export function StaffAttendanceContent({
               return;
             }
 
-            const { error } = await supabase.from('attendance').upsert(
-              {
-                employee_id: activeWorker.id,
-                employee_name: activeWorker.full_name,
-                work_date: todayStr,
-                check_in: timeStr,
-                shift_name: currentShift,
-                status: 'PRESENT',
-              },
-              {
-                onConflict: 'employee_id,work_date,shift_name',
-                ignoreDuplicates: true,
-              }
-            );
-
-            if (error) throw error;
+            await checkInAttendance({
+              employee: activeWorker,
+              workDate: todayStr,
+              shiftName: currentShift,
+              checkIn: timeStr,
+            });
 
             showToast('Vào ca thành công', `Đã ghi nhận [${currentShift}] lúc ${timeStr}.`, 'success');
             await loadInitialShiftStatus(activeWorker);
