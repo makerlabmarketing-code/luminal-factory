@@ -28,7 +28,7 @@ export default function AdminSystemSettings() {
   const [value, setValue] = useState('');
   const [description, setDescription] = useState('');
 
-  const [showPass, setShowPass] = useState(false);
+  const [visibleSecretKey, setVisibleSecretKey] = useState<string | null>(null);
 
   const loadSettingsData = async () => {
     setLoading(true);
@@ -234,6 +234,7 @@ export default function AdminSystemSettings() {
               ) : (
                 paginatedSettings.map((cfg) => {
                   const isSecret = (cfg.key || '').toLowerCase().includes('pass') || (cfg.key || '').toLowerCase().includes('token');
+                  const isSecretVisible = visibleSecretKey === cfg.key;
                   return (
                     <tr key={cfg.key} className="hover:bg-slate-950/20 transition">
                       <td className="p-4"><span className="bg-slate-950 border border-slate-800 px-2.5 py-1.5 rounded-lg text-purple-400 font-bold block w-fit text-[10px]">{getGroupLabel(cfg.group_name)}</span></td>
@@ -241,14 +242,18 @@ export default function AdminSystemSettings() {
                       <td className="p-4">
                         <div className="relative">
                           <input 
-                            type={isSecret && !showPass ? 'password' : 'text'}
+                            type={isSecret && !isSecretVisible ? 'password' : 'text'}
                             className={`w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 font-mono font-semibold focus:outline-none transition text-xs ${isSecret ? 'text-amber-400 tracking-wider' : 'text-slate-300'}`}
                             value={cfg.value || ''}
                             onChange={(e) => handleInlineValueChange(cfg.key, e.target.value)}
                           />
                           {isSecret && (
-                            <button type="button" onClick={() => setShowPass(!showPass)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500">
-                              {showPass ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                            <button
+                              type="button"
+                              onClick={() => setVisibleSecretKey(isSecretVisible ? null : cfg.key)}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500"
+                            >
+                              {isSecretVisible ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                             </button>
                           )}
                         </div>
