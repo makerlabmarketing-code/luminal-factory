@@ -78,6 +78,27 @@
 - What happens when [boundary condition]?
 - How does system handle [error scenario]?
 
+## Operational Governance *(mandatory for ERP changes)*
+
+<!--
+  ACTION REQUIRED: Fill this section for Luminal Factory ERP work. Keep entries
+  technology-agnostic, but name the operational concern and source-of-truth.
+-->
+
+**Operational Area**: [attendance/payroll/production workflow/materials/inventory/expenses/finance/commerce administration/staff portal/admin or N/A]
+
+**Authoritative Source Records**: [Which records/tables/events are source-of-truth? Which values are derived?]
+
+**Stable Identifiers**: [Which stable IDs link records? Confirm display names are presentation only.]
+
+**Business Calculations**: [Worked hours, payroll, workflow transition validation, inventory, financial aggregation, or N/A. Include rounding/timezone/day-boundary assumptions when applicable.]
+
+**Authorization Boundary**: [RLS/trusted server boundary/role ownership assumptions for mutations and reads.]
+
+**History and Traceability**: [What historical records, workflow history, source records, or audit context must remain interpretable?]
+
+**ERP/Storefront Boundary**: [Confirm whether this is ERP-owned, storefront-owned, or shared-contract work.]
+
 ## Requirements *(mandatory)*
 
 <!--

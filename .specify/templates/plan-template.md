@@ -40,7 +40,38 @@
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-[Gates determined based on constitution file]
+- **Operational correctness**: Identify the authoritative source records,
+  derived values, and operational priority affected by the change.
+- **Brownfield seam**: Name the existing responsibility seam being changed and
+  list current callers, dependent views, business calculations, side effects,
+  and validation before proposing edits.
+- **Stable relationships**: Confirm persisted relationships use stable
+  identifiers rather than display names such as employee full names.
+- **Domain boundaries**: State which ERP concerns are in scope: attendance,
+  payroll, production workflow, materials, inventory, expenses, finance, or
+  commerce administration. Document source-of-truth and derived-total behavior.
+- **Production workflow**: For workflow work, distinguish project-level and
+  colorway-level progress, preserve history, and avoid locking a final state
+  machine without approved Luminal operations review.
+- **Architecture boundaries**: Keep business rules and critical calculations
+  outside presentational JSX. Use Server Components unless browser interaction
+  requires Client Components. Identify service/data boundaries used.
+- **Supabase and authorization**: Inspect current Supabase clients, callers,
+  auth behavior, environment variables, and RLS or trusted server boundaries
+  before changing Supabase access or privileged mutations.
+- **TypeScript and domain language**: Use strict TypeScript, introduce no new
+  `any`, and prefer reusable operational domain types and explicit names.
+- **Critical calculation protection**: Define tests or validation for worked
+  hours, payroll, workflow transitions, inventory, and financial aggregation
+  when affected. Document rounding, timezone, and day-boundary assumptions.
+- **ERP/storefront boundary**: Keep ERP operational administration separate from
+  public storefront experience. Do not lock monorepo/shared-code strategy
+  before both repositories and shared data contracts are audited.
+- **Operational UI**: Prioritize data clarity, state clarity, action clarity,
+  scanning speed, responsive usability, then visual polish. Status must not rely
+  only on color.
+- **Validation plan**: Inspect actual package scripts before selecting commands.
+  List the available validations and any manual operational checks required.
 
 ## Project Structure
 
