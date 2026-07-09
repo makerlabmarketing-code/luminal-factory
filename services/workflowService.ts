@@ -22,6 +22,14 @@ function toWorkflowSetting(project: WorkflowProject, phase: WorkflowPhase): Work
     description: JSON.stringify({
       project_drive_link: project.drive_link || '',
       project_deadline: project.project_deadline || '',
+      colorway_name: phase.colorway_name || '',
+      colorway_code: phase.colorway_code || '',
+      target_release_date: project.project_deadline || '',
+      stage_name: phase.name || '',
+      stage_type: phase.stage_type || '',
+      stage_owner: phase.stage_owner || '',
+      stage_deadline: phase.planned_end_date || '',
+      next_action: phase.next_action || '',
       tasks_list: (phase.tasks || []).map((task) => ({
         id: task.id,
         name: task.name || '',
@@ -102,6 +110,15 @@ export async function createWorkflowProject(
       phaseName: phase.name?.trim() || `Giai doan ${index + 1}`,
       orderIndex: index,
       status: index === 0 ? 'DOING' : 'TODO',
+      colorwayName: phase.colorway_name?.trim(),
+      colorwayCode: phase.colorway_code?.trim(),
+      stageType: phase.stage_type?.trim(),
+      stageOwner: phase.stage_owner?.trim(),
+      plannedStartDate: phase.planned_start_date,
+      plannedEndDate: phase.planned_end_date,
+      progress: phase.progress,
+      nextAction: phase.next_action?.trim(),
+      requiredReview: phase.required_review,
     });
 
     const tasksToInsert = (phase.tasks || [])

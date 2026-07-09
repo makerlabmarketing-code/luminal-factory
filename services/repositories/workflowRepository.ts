@@ -54,6 +54,17 @@ export function normalizePhaseRow(row: GenericRow): WorkflowPhase | null {
     name: pickFirstText(row, ['name', 'phase_name', 'title']) || `Giai doan ${id}`,
     order_index: pickFirstNumber(row, ['order_index', 'sort_order', 'position']) ?? 0,
     status: pickFirstText(row, ['status', 'phase_status', 'value']) || 'TODO',
+    colorway_name: pickFirstText(row, ['colorway_name', 'colorway']) || null,
+    colorway_code: pickFirstText(row, ['colorway_code', 'internal_code']) || null,
+    stage_type: pickFirstText(row, ['stage_type', 'phase_type']) || null,
+    stage_owner: pickFirstText(row, ['stage_owner', 'owner_name', 'owner']) || null,
+    planned_start_date: pickFirstText(row, ['planned_start_date', 'start_date']) || null,
+    planned_end_date: pickFirstText(row, ['planned_end_date', 'stage_deadline', 'end_date']) || null,
+    actual_start_date: pickFirstText(row, ['actual_start_date']) || null,
+    actual_end_date: pickFirstText(row, ['actual_end_date']) || null,
+    progress: pickFirstNumber(row, ['progress', 'stage_progress']) ?? null,
+    next_action: pickFirstText(row, ['next_action', 'last_action']) || null,
+    required_review: typeof row.required_review === 'boolean' ? row.required_review : null,
   };
 }
 
@@ -177,6 +188,15 @@ export class WorkflowRepository {
     phaseName: string;
     orderIndex: number;
     status: string;
+    colorwayName?: string;
+    colorwayCode?: string;
+    stageType?: string;
+    stageOwner?: string;
+    plannedStartDate?: string;
+    plannedEndDate?: string;
+    progress?: number;
+    nextAction?: string;
+    requiredReview?: boolean;
   }): Promise<number> {
     const payloads: GenericRow[] = [
       {
@@ -184,12 +204,27 @@ export class WorkflowRepository {
         name: params.phaseName,
         order_index: params.orderIndex,
         status: params.status,
+        colorway_name: params.colorwayName || null,
+        colorway_code: params.colorwayCode || null,
+        stage_type: params.stageType || null,
+        stage_owner: params.stageOwner || null,
+        planned_start_date: params.plannedStartDate || null,
+        planned_end_date: params.plannedEndDate || null,
+        progress: params.progress ?? 0,
+        next_action: params.nextAction || null,
+        required_review: params.requiredReview ?? false,
       },
       {
         project_id: params.projectId,
         phase_name: params.phaseName,
         sort_order: params.orderIndex,
         phase_status: params.status,
+      },
+      {
+        project_id: params.projectId,
+        name: params.phaseName,
+        order_index: params.orderIndex,
+        status: params.status,
       },
     ];
 

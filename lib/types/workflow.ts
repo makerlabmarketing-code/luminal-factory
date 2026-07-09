@@ -15,6 +15,14 @@ export interface WorkflowTask {
 export interface WorkflowDescription {
   project_drive_link?: string;
   project_deadline?: string;
+  colorway_name?: string;
+  colorway_code?: string;
+  target_release_date?: string;
+  stage_name?: string;
+  stage_type?: string;
+  stage_owner?: string;
+  stage_deadline?: string;
+  next_action?: string;
   tasks_list?: WorkflowTask[];
 }
 
@@ -50,6 +58,17 @@ export interface WorkflowPhase {
   name: string;
   order_index?: number | null;
   status?: string | null;
+  colorway_name?: string | null;
+  colorway_code?: string | null;
+  stage_type?: string | null;
+  stage_owner?: string | null;
+  planned_start_date?: string | null;
+  planned_end_date?: string | null;
+  actual_start_date?: string | null;
+  actual_end_date?: string | null;
+  progress?: number | null;
+  next_action?: string | null;
+  required_review?: boolean | null;
   tasks?: WorkflowTask[];
 }
 
@@ -65,5 +84,14 @@ export interface WorkflowProjectInsertInput {
 
 export interface WorkflowPhaseFormInput {
   name?: string;
+  colorway_name?: string;
+  colorway_code?: string;
+  stage_type?: string;
+  stage_owner?: string;
+  planned_start_date?: string;
+  planned_end_date?: string;
+  progress?: number;
+  next_action?: string;
+  required_review?: boolean;
   tasks?: WorkflowTask[];
 }
