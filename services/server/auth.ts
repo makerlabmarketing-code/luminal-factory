@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { createClient } from '@/ultis/supabase/server';
+import { createClient } from '@/utils/supabase/server';
 
 export class AuthFlowError extends Error {
   status: number;

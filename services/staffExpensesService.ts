@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/utils/supabase/client';
 import type { Employee } from '@/lib/types/employee';
 import type { FinancialLedgerEntry } from '@/lib/types/finance';
 import {

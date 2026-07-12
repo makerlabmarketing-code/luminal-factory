@@ -1,7 +1,7 @@
 // app/admin/attendance/page.tsx
 'use client';
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/utils/supabase/client';
 import { useNotification } from '@/component/NotificationContext';
 import MonthPicker from '@/component/MonthPicker';
 import DailyAttendanceModal from './components/DailyAttendanceModal';

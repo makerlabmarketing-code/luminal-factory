@@ -1,7 +1,7 @@
 // app/admin/email-history/page.tsx
 'use client';
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/utils/supabase/client';
 import { Mail, Search, RefreshCcw, ChevronLeft, X, ChevronRight, ChevronsLeft, ChevronsRight, CheckCircle2, XCircle, Trash2, Eye } from 'lucide-react';
 export default function AdminEmailHistoryLog() {
   const [history, setHistory] = useState<any[]>([]);

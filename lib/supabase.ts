@@ -1,19 +1,5 @@
-// lib/supabase.ts
-import { createBrowserClient } from '@supabase/ssr';
-import { createClient } from '@supabase/supabase-js';
-
-export function createBrowserSupabaseClient() {
-  return createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
-}
-
-export function createServerSupabaseClient() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
-}
-
-export const supabase = createBrowserSupabaseClient();
+// Deprecated compatibility exports. Import from utils/supabase/* instead.
+export {
+  createBrowserSupabaseClient,
+  createClient,
+} from '@/utils/supabase/client';

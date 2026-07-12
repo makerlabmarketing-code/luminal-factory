@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/ultis/supabase/server';
+import { createClient } from '@/utils/supabase/server';
 import { AuthFlowError, requireAuthenticatedEmployee } from '@/services/server/auth';
 
 const MAX_PROFILE_FIELD_LENGTH = 120;

@@ -1,10 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { getSupabasePublicKey } from '../utils/supabase/env';
 
 const repositoryRoot = join(__dirname, '..');
-const scannedProductionDirs = ['app', 'component', 'lib', 'services', 'ultis'];
+const scannedProductionDirs = ['app', 'component', 'lib', 'services', 'ultis', 'utils'];
 const staffUiDirs = ['app/staff'];
+
+function restoreEnv(name: string, value: string | undefined): void {
+  if (value === undefined) {
+    delete process.env[name];
+    return;
+  }
+
+  process.env[name] = value;
+}
 
 function collectFiles(dir: string): string[] {
   if (!existsSync(dir)) return [];
@@ -115,5 +125,80 @@ describe('static security boundaries', () => {
     });
 
     expect(offenders).toEqual([]);
+  });
+
+  it('prefers the publishable Supabase key over the legacy anon fallback', () => {
+    const previousPublishable = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+    const previousAnon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = 'publishable-test-key';
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'anon-test-key';
+
+    expect(getSupabasePublicKey()).toBe('publishable-test-key');
+
+    restoreEnv('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', previousPublishable);
+    restoreEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', previousAnon);
+  });
+
+  it('falls back to the legacy anon Supabase key during compatibility rollout', () => {
+    const previousPublishable = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+    const previousAnon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+    delete process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'anon-test-key';
+
+    expect(getSupabasePublicKey()).toBe('anon-test-key');
+
+    restoreEnv('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', previousPublishable);
+    restoreEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', previousAnon);
+  });
+
+  it('fails clearly when no Supabase public key is configured without exposing a key value', () => {
+    const previousPublishable = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+    const previousAnon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+    delete process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+    delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+    expect(() => getSupabasePublicKey()).toThrow(/Supabase public key/);
+
+    restoreEnv('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', previousPublishable);
+    restoreEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', previousAnon);
+  });
+
+  it('does not import privileged Supabase clients from Client Components', () => {
+    const files = scannedProductionDirs.flatMap((dir) =>
+      collectFiles(join(repositoryRoot, dir))
+    );
+
+    const offenders = files.filter((file) => {
+      const source = readFileSync(file, 'utf8');
+      return (
+        /['"]use client['"]/.test(source) &&
+        /@\/utils\/supabase\/(privileged|admin)|@\/ultis\/supabase\/(privileged|admin)/.test(source)
+      );
+    });
+
+    expect(offenders).toEqual([]);
+  });
+
+  it('does not import the browser Supabase owner from server routes or server services', () => {
+    const serverDirs = ['app/api', 'services/server'];
+    const files = serverDirs.flatMap((dir) => collectFiles(join(repositoryRoot, dir)));
+
+    const offenders = files.filter((file) => {
+      const source = readFileSync(file, 'utf8');
+      return /@\/utils\/supabase\/client|@\/lib\/supabase/.test(source);
+    });
+
+    expect(offenders).toEqual([]);
+  });
+
+  it('keeps lib/supabase as a compatibility layer without a top-level browser client', () => {
+    const source = readFileSync(join(repositoryRoot, 'lib/supabase.ts'), 'utf8');
+
+    expect(source).not.toMatch(/createBrowserClient/);
+    expect(source).not.toMatch(/export\s+const\s+supabase/);
+    expect(source).toMatch(/Deprecated compatibility exports/);
   });
 });

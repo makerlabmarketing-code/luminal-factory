@@ -1,7 +1,7 @@
 // app/admin/facilities/page.tsx
 'use client';
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/utils/supabase/client';
 import { useNotification } from '@/component/NotificationContext';
 import { fetchCoordinatesFromAddress } from '@/ultis/geocoding'; 
 import { MapPin, Plus, Trash2, Edit2, X, RefreshCcw, Navigation, Loader2 } from 'lucide-react';

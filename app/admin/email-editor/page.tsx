@@ -1,7 +1,7 @@
 ﻿// app/admin/email-editor/page.tsx
 'use client';
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/utils/supabase/client';
 import { useNotification } from '@/component/NotificationContext';
 import { Mail, Plus, Trash2, Edit2, X, Save, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Search, RefreshCcw, Send, Sparkles } from 'lucide-react';
 

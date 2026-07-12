@@ -1,7 +1,7 @@
 // app/admin/metadata/page.tsx
 'use client';
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/utils/supabase/client';
 import { useNotification } from '@/component/NotificationContext';
 import { Database, Plus, Trash2, Save, RefreshCcw, Layers, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 

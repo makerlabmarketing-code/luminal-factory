@@ -1,6 +1,6 @@
 // app/api/attendance/check-out/route.ts
 import { NextResponse } from 'next/server';
-import { createClient } from '@/ultis/supabase/server';
+import { createClient } from '@/utils/supabase/server';
 import { AuthFlowError, requireAuthenticatedEmployee } from '@/services/server/auth';
 
 function toErrorResponse(error: unknown) {

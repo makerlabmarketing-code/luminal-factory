@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { createClient } from '@/ultis/supabase/server';
+import { createClient } from '@/utils/supabase/server';
 import type { Facility } from '@/lib/types/facility';
 import {
   requireAuthenticatedEmployee,

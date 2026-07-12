@@ -1,5 +1,5 @@
 import nodemailer from 'nodemailer';
-import { createServerSupabaseClient } from '@/lib/supabase';
+import { createServerSupabaseClient } from '@/utils/supabase/server';
 import { mergeAttendanceRecords, isAttendanceRecordOverdue } from '@/services/attendanceService';
 import { businessDateFromInstant, formatBusinessDateInput } from '@/lib/business-date';
 import type { AttendanceRecord, Shift } from '@/lib/types/attendance';

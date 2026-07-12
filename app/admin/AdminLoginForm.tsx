@@ -3,7 +3,7 @@
 import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { KeyRound, RefreshCcw } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/utils/supabase/client';
 
 interface AdminLoginFormProps {
   message?: string;

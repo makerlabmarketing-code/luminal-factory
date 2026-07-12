@@ -1,9 +1,10 @@
 // app/api/payments/webhook/route.ts
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { createServerSupabaseClient } from '@/utils/supabase/server';
 
 export async function POST(request: Request) {
   try {
+    const supabase = createServerSupabaseClient();
     const paymentResponse = await request.json();
 
     // 1. Đọc dữ liệu lõi từ phản hồi giao dịch của ngân hàng (Mẫu chuẩn API VietQR/Casso/PayOS)

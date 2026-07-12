@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/utils/supabase/client';
 import type {
   WorkflowPhase,
   WorkflowProject,

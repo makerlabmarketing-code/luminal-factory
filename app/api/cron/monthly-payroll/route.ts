@@ -1,6 +1,6 @@
 // app/api/cron/capital-call/route.ts
 import { NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase';
+import { createServerSupabaseClient } from '@/utils/supabase/server';
 import { sendTemplateEmailByGroup } from '@/services/emailService';
 
 const CAPITAL_CALL_GROUP = 'CAPITAL_CALL';

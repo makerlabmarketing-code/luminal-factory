@@ -3,7 +3,7 @@
 import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { RefreshCcw, User } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/utils/supabase/client';
 
 interface StaffLoginFormProps {
   message?: string;

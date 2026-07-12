@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getDistance } from 'geolib';
-import { createClient } from '@/ultis/supabase/server';
+import { createClient } from '@/utils/supabase/server';
 import {
   businessMonthFromDateInput,
   businessMonthFromInstant,

@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { createServerSupabaseClient } from '@/utils/supabase/server';
 import { getDistance } from 'geolib';
 
 export async function POST(request: Request) {
   try {
+    const supabase = createServerSupabaseClient();
     const body = await request.json();
     const { qrToken, userLat, userLng } = body;
 
