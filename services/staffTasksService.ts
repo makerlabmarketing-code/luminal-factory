@@ -4,7 +4,6 @@ import type {
   WorkflowDescription,
   WorkflowSetting,
 } from '@/lib/types/workflow';
-import { getStaffEmployeeByToken } from '@/services/staffPortalService';
 import {
   getWorkflowItems,
   updateWorkflowProjectDriveLink,
@@ -30,18 +29,13 @@ export function parseWorkflowDescription(description?: string | null): WorkflowD
 }
 
 export async function getStaffTasksData(params: {
-  token?: string | null;
   workerData?: Employee | null;
 }): Promise<{
   workerId: number | string | null;
   workerName: string;
   workflowItems: WorkflowSetting[];
 }> {
-  let employee = params.workerData || null;
-
-  if (!employee && params.token) {
-    employee = await getStaffEmployeeByToken(params.token);
-  }
+  const employee = params.workerData || null;
 
   if (!employee) {
     return {

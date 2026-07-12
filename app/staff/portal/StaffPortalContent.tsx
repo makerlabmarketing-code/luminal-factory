@@ -1,24 +1,27 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
 import { Banknote, ClipboardList, Clock, RefreshCcw, User } from 'lucide-react';
 import { StaffAttendanceContent } from '../attendance/AttendanceView';
 import { StaffTasksContent } from '../tasks/TasksView';
 import { StaffExpensesContent } from '../expenses/ExpensesView';
 import { StaffProfileContent } from '../profile/ProfileView';
-import { getStaffPortalData } from '@/services/staffPortalService';
 import type { StaffPortalTab } from '@/lib/types/staff';
 import type { Employee } from '@/lib/types/employee';
 import type { Facility } from '@/lib/types/facility';
 
-export default function StaffPortalContent() {
-  const searchParams = useSearchParams();
-  const token = searchParams.get('token');
+interface StaffPortalContentProps {
+  workerData: Employee;
+  assignedBranchData: Facility | null;
+}
 
-  const [worker, setWorker] = useState<Employee | null>(null);
-  const [assignedBranch, setAssignedBranch] = useState<Facility | null>(null);
-  const [loading, setLoading] = useState(true);
+export default function StaffPortalContent({
+  workerData,
+  assignedBranchData,
+}: StaffPortalContentProps) {
+  const [worker] = useState<Employee | null>(workerData);
+  const [assignedBranch] = useState<Facility | null>(assignedBranchData);
+  const [loading] = useState(false);
   const [activeTab, setActiveTab] = useState<StaffPortalTab>('attendance');
   const [visitedTabs, setVisitedTabs] = useState<Record<StaffPortalTab, boolean>>({
     attendance: true,
@@ -26,28 +29,6 @@ export default function StaffPortalContent() {
     expenses: false,
     profile: false,
   });
-
-  useEffect(() => {
-    const loadPortalData = async () => {
-      if (!token) {
-        setLoading(false);
-        return;
-      }
-
-      try {
-        const portalData = await getStaffPortalData(token);
-
-        setWorker(portalData.employee);
-        setAssignedBranch(portalData.assignedBranch);
-      } catch (error) {
-        console.error(error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadPortalData();
-  }, [token]);
 
   useEffect(() => {
     setVisitedTabs((prev) =>
@@ -94,20 +75,20 @@ export default function StaffPortalContent() {
 
       <div className={tabClasses.attendance}>
         {visitedTabs.attendance && (
-          <StaffAttendanceContent token={token} workerData={worker} assignedBranchData={assignedBranch} />
+          <StaffAttendanceContent workerData={worker} assignedBranchData={assignedBranch} />
         )}
       </div>
 
       <div className={tabClasses.tasks}>
-        {visitedTabs.tasks && <StaffTasksContent token={token} workerData={worker} />}
+        {visitedTabs.tasks && <StaffTasksContent workerData={worker} />}
       </div>
 
       <div className={tabClasses.expenses}>
-        {visitedTabs.expenses && <StaffExpensesContent token={token} workerData={worker} />}
+        {visitedTabs.expenses && <StaffExpensesContent workerData={worker} />}
       </div>
 
       <div className={tabClasses.profile}>
-        {visitedTabs.profile && <StaffProfileContent token={token} workerData={worker} />}
+        {visitedTabs.profile && <StaffProfileContent workerData={worker} assignedBranchData={assignedBranch} />}
       </div>
 
       <div className="fixed bottom-0 left-0 right-0 bg-slate-900/95 backdrop-blur-md border-t border-slate-800 px-2 py-3.5 z-50 flex justify-around items-center shadow-2xl text-[10px] font-bold">

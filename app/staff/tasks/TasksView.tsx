@@ -6,7 +6,6 @@ import type {
   WorkflowTask,
 } from '@/lib/types/workflow';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
 import {
   Activity,
   Calendar,
@@ -31,7 +30,6 @@ import {
 } from '@/services/staffTasksService';
 
 interface StaffTasksContentProps {
-  token?: string | null;
   workerData?: Employee | null;
 }
 
@@ -42,12 +40,9 @@ interface RenderableWorkflowTask extends WorkflowTask {
 const ITEMS_PER_PAGE = 5;
 
 export function StaffTasksContent({
-  token: propsToken,
   workerData,
 }: StaffTasksContentProps) {
   const { showToast } = useNotification();
-  const searchParams = useSearchParams();
-  const token = propsToken || searchParams.get('token');
   const initialWorkerId = workerData?.employee_id || workerData?.id || null;
 
   const [workerName, setWorkerName] = useState(workerData?.full_name || '');
@@ -60,14 +55,13 @@ export function StaffTasksContent({
   const [editableTasks, setEditableTasks] = useState<Record<string, EditableWorkflowTask>>({});
 
   const loadTasksData = useCallback(async () => {
-    if (!token && !workerData) {
+    if (!workerData) {
       setLoading(false);
       return;
     }
 
     try {
       const tasksData = await getStaffTasksData({
-        token,
         workerData,
       });
 
@@ -92,7 +86,7 @@ export function StaffTasksContent({
     } finally {
       setLoading(false);
     }
-  }, [token, workerData, selectedProjectName]);
+  }, [workerData, selectedProjectName]);
 
   useEffect(() => {
     void loadTasksData();

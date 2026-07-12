@@ -1,55 +1,61 @@
 ﻿'use client';
 
-import { useEffect, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
+import { useCallback, useEffect, useState } from 'react';
 import { useNotification } from '@/component/NotificationContext';
 import MonthPicker from '@/component/MonthPicker';
 import { Power, RefreshCcw, AlertTriangle, CheckCircle2, Building2 } from 'lucide-react';
 import { calculateHoursFromStrings } from '@/services/payrollService';
 import {
   businessDateFromDateInput,
-  businessDateFromInstant,
-  businessMonthFromDateInput,
   businessMonthFromInstant,
-  businessMonthRange,
   formatBusinessDate,
-  formatBusinessDateInput,
   formatBusinessMonthInput,
 } from '@/lib/business-date';
-import {
-  checkInAttendance,
-  checkOutAttendance,
-  getAttendanceRecordByShift,
-  getEmployeeHourlyRate,
-  getOpenAttendanceRecord,
-  isAttendanceRecordComplete,
-  isMissingCheckoutRecord,
-  mergeAttendanceRecords,
-} from '@/services/attendanceService';
 import type { AttendanceRecord } from '@/lib/types/attendance';
 import type { Employee } from '@/lib/types/employee';
 import type { Facility as FacilityType } from '@/lib/types/facility';
 
 interface AttendanceViewProps {
-  token?: string | null;
   workerData?: Employee | null;
   assignedBranchData?: FacilityType | null;
 }
 
 const HISTORY_ITEMS_PER_PAGE = 5;
 
+interface StaffAttendancePayload {
+  employee: Employee;
+  localBranchName: string;
+  todayRecord: AttendanceRecord | null;
+  isInShift: boolean;
+  attendanceHistory: AttendanceRecord[];
+}
+
+function isAttendanceRecordComplete(record: AttendanceRecord): boolean {
+  return Boolean(record.check_in && record.check_out);
+}
+
+function isMissingCheckoutRecord(record: AttendanceRecord): boolean {
+  return Boolean(record.check_in && !record.check_out);
+}
+
+function autoDetectShift(date: Date) {
+  const hour = date.getHours();
+
+  if (hour >= 6 && hour < 12) return 'Ca Sáng';
+  if (hour >= 12 && hour < 18) return 'Ca Chiều';
+
+  return 'Ca Tối';
+}
+
 export function StaffAttendanceContent({
-  token: propsToken,
   workerData,
   assignedBranchData,
 }: AttendanceViewProps) {
   const { showToast } = useNotification();
-  const searchParams = useSearchParams();
-  const token = propsToken || searchParams.get('token');
-  void assignedBranchData;
-  const [worker, setWorker] = useState<Employee | null>(null);
-  const [localBranchName, setLocalBranchName] = useState('Đang nạp định vị...');
+  const [worker, setWorker] = useState<Employee | null>(workerData || null);
+  const [localBranchName, setLocalBranchName] = useState(
+    assignedBranchData?.facility_name || assignedBranchData?.name || 'Đang nạp định vị...'
+  );
   const [isInShift, setIsInShift] = useState(false);
   const [todayRecord, setTodayRecord] = useState<AttendanceRecord | null>(null);
   const [attendanceHistory, setAttendanceHistory] = useState<AttendanceRecord[]>([]);
@@ -60,161 +66,43 @@ export function StaffAttendanceContent({
   const [historyPage, setHistoryPage] = useState(1);
   const [fetching, setFetching] = useState(true);
 
-  const autoDetectShift = (date: Date) => {
-    const hour = date.getHours();
-
-    if (hour >= 6 && hour < 12) return 'Ca Sáng';
-    if (hour >= 12 && hour < 18) return 'Ca Chiều';
-
-    return 'Ca Tối';
-  };
-
-  const findMatchedBranch = (
-    workerObj: Employee,
-    branchList: FacilityType[]
-  ): FacilityType | undefined => {
-    return branchList.find((branch) => {
-      if (String(workerObj.branch_code) === String(branch.id)) return true;
-
-      const branchNameLower = branch.facility_name?.toLowerCase();
-      if (workerObj.branch_code?.toLowerCase() === branchNameLower) return true;
-
-      return false;
-    });
-  };
-
-  const resolveBranchName = (branch?: FacilityType) => {
-    return branch?.facility_name || branch?.name || 'Chưa gán cơ sở';
-  };
-
-  const loadAttendanceHistory = async (currentWorker: Employee, monthValue = historyMonthInput) => {
-    const month = businessMonthFromDateInput(monthValue);
-    const monthRange = businessMonthRange(month);
-    const startDate = formatBusinessDateInput(monthRange.localStart);
-    const endDate = formatBusinessDateInput(monthRange.localEnd);
-
-    const { data, error } = await supabase
-      .from('attendance')
-      .select('*')
-      .eq('employee_id', currentWorker.id)
-      .gte('work_date', startDate)
-      .lt('work_date', endDate)
-      .order('work_date', { ascending: false })
-      .order('id', { ascending: false });
-
-    if (error) throw error;
-
-    setAttendanceHistory(mergeAttendanceRecords((data || []) as AttendanceRecord[]));
+  const applyAttendancePayload = (payload: StaffAttendancePayload) => {
+    setWorker(payload.employee);
+    setLocalBranchName(payload.localBranchName);
+    setTodayRecord(payload.todayRecord);
+    setIsInShift(payload.isInShift);
+    setAttendanceHistory(payload.attendanceHistory);
     setHistoryPage(1);
   };
 
-  const loadInitialShiftStatus = async (currentWorker: Employee) => {
+  const loadAttendanceData = useCallback(async (monthValue = historyMonthInput) => {
     try {
-      const todayStr = formatBusinessDateInput(businessDateFromInstant(new Date()));
-
-      const openRecord = await getOpenAttendanceRecord({
-        employeeId: currentWorker.id,
-        workDate: todayStr,
+      setFetching(true);
+      const response = await fetch(`/api/staff/attendance?month=${encodeURIComponent(monthValue)}`, {
+        cache: 'no-store',
       });
 
-      if (openRecord) {
-        setTodayRecord(openRecord);
-        setIsInShift(true);
-        return;
+      if (!response.ok) {
+        const result = (await response.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(result?.error || 'Không thể tải dữ liệu chấm công.');
       }
 
-      const currentShift = autoDetectShift(new Date());
-
-      const currentShiftRecord = await getAttendanceRecordByShift({
-        employeeId: currentWorker.id,
-        workDate: todayStr,
-        shiftName: currentShift,
-      });
-
-      setTodayRecord(currentShiftRecord || null);
-      setIsInShift(false);
+      applyAttendancePayload((await response.json()) as StaffAttendancePayload);
     } catch (error) {
-      console.error(error);
+      const message = error instanceof Error ? error.message : 'Không thể tải dữ liệu chấm công.';
+      showToast('Lỗi kết nối', message, 'error');
     } finally {
       setFetching(false);
     }
-  };
+  }, [historyMonthInput, showToast]);
 
   useEffect(() => {
     const timer = setInterval(() => setLiveTime(new Date()), 1000);
 
-    const initialize = async () => {
-      setFetching(true);
-
-      try {
-        let finalWorker: Employee | null = null;
-
-        if (workerData?.id) {
-          const { data: freshEmp } = await supabase
-            .from('employees')
-            .select('*')
-            .eq('id', workerData.id)
-            .maybeSingle();
-
-          finalWorker = (freshEmp as Employee) || workerData;
-        } else if (token) {
-          const { data: emp } = await supabase
-            .from('employees')
-            .select('*')
-            .eq('qr_token', token)
-            .maybeSingle();
-
-          finalWorker = emp as Employee | null;
-        }
-
-        if (!finalWorker) {
-          setFetching(false);
-          return;
-        }
-
-        setWorker(finalWorker);
-
-        try {
-          const { data: facs } = await supabase.from('facilities').select('*');
-          const matchedBranch = findMatchedBranch(finalWorker, (facs || []) as FacilityType[]);
-
-          setLocalBranchName(resolveBranchName(matchedBranch));
-        } catch {
-          setLocalBranchName('Lỗi đồng bộ chi nhánh');
-        }
-
-        await loadInitialShiftStatus(finalWorker);
-        await loadAttendanceHistory(finalWorker);
-      } catch (error) {
-        console.error(error);
-        setFetching(false);
-      }
-    };
-
-    initialize();
+    void loadAttendanceData();
 
     return () => clearInterval(timer);
-  }, [token, workerData]);
-
-  const calculateDistance = (
-    lat1: number,
-    lon1: number,
-    lat2: number,
-    lon2: number
-  ) => {
-    const radius = 6371e3;
-    const dLat = ((lat2 - lat1) * Math.PI) / 180;
-    const dLon = ((lon2 - lon1) * Math.PI) / 180;
-
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos((lat1 * Math.PI) / 180) *
-        Math.cos((lat2 * Math.PI) / 180) *
-        Math.sin(dLon / 2) *
-        Math.sin(dLon / 2);
-
-    return radius * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
-  };
+  }, [loadAttendanceData]);
 
   const handleToggleShift = async () => {
     if (!worker) {
@@ -228,97 +116,29 @@ export function StaffAttendanceContent({
     }
 
     try {
-      const { data: facs } = await supabase.from('facilities').select('*');
-
-      const { data: freshEmp } = await supabase
-        .from('employees')
-        .select('*')
-        .eq('id', worker.id)
-        .maybeSingle();
-
-      const activeWorker = ((freshEmp as Employee) || worker) as Employee;
-      const matchedBranch = findMatchedBranch(activeWorker, (facs || []) as FacilityType[]);
-
-      setLocalBranchName(resolveBranchName(matchedBranch));
-
-      if (!matchedBranch) {
-        showToast(
-          'Lỗi địa điểm',
-          'Cơ sở được giao của bạn chưa được cấu hình tọa độ rào ranh giới GPS!',
-          'error'
-        );
-        return;
-      }
-
       navigator.geolocation.getCurrentPosition(
         async (position) => {
           try {
             const userLat = position.coords.latitude;
             const userLng = position.coords.longitude;
 
-            const distance = calculateDistance(
-              userLat,
-              userLng,
-              Number(matchedBranch.lat),
-              Number(matchedBranch.lng)
-            );
-
-            if (distance > Number(matchedBranch.radius)) {
-              showToast(
-                'Từ chối chấm công',
-                `Vị trí sai! Bạn đang cách cơ sở khoảng ${Math.round(distance)} mét.`,
-                'error'
-              );
-              return;
-            }
-
-            const now = new Date();
-            const todayStr = formatBusinessDateInput(businessDateFromInstant(now));
-            const timeStr = now.toLocaleTimeString('vi-VN', { hour12: false });
-            const currentShift = autoDetectShift(now);
-
-            const openRecord = await getOpenAttendanceRecord({
-              employeeId: activeWorker.id,
-              workDate: todayStr,
+            const response = await fetch('/api/staff/attendance', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ userLat, userLng }),
             });
 
-            if (openRecord) {
-              const record = openRecord;
-              await checkOutAttendance({
-                record,
-                checkOut: timeStr,
-                hourlyRate: getEmployeeHourlyRate(activeWorker),
-              });
+            const result = (await response.json().catch(() => null)) as {
+              error?: string;
+              message?: string;
+            } | null;
 
-              showToast('Tắt máy về', `Đã tan ca [${record.shift_name}] thành công.`, 'success');
-              await loadInitialShiftStatus(activeWorker);
-              await loadAttendanceHistory(activeWorker);
-              return;
+            if (!response.ok) {
+              throw new Error(result?.error || 'Không thể chấm công.');
             }
 
-            const existingShift = await getAttendanceRecordByShift({
-              employeeId: activeWorker.id,
-              workDate: todayStr,
-              shiftName: currentShift,
-            });
-
-            if (existingShift) {
-              setTodayRecord(existingShift);
-              setIsInShift(false);
-              showToast('Đã ghi nhận', `Ca [${currentShift}] đã có dữ liệu chấm công.`, 'info');
-              return;
-            }
-
-            await checkInAttendance({
-              employee: activeWorker,
-              workDate: todayStr,
-              shiftName: currentShift,
-              checkIn: timeStr,
-            });
-
-            showToast('Vào ca thành công', `Đã ghi nhận [${currentShift}] lúc ${timeStr}.`, 'success');
-            await loadInitialShiftStatus(activeWorker);
-            await loadAttendanceHistory(activeWorker);
+            showToast('Cập nhật ca làm', result?.message || 'Đã ghi nhận chấm công.', 'success');
+            await loadAttendanceData();
           } catch (error) {
             const message = error instanceof Error ? error.message : 'Không thể chấm công.';
             showToast('Lỗi kết nối', message, 'error');
@@ -440,7 +260,7 @@ export function StaffAttendanceContent({
               onChange={(value) => {
                 setHistoryMonthInput(value);
                 setHistoryPage(1);
-                if (worker) void loadAttendanceHistory(worker, value);
+                if (worker) void loadAttendanceData(value);
               }}
               accent="purple"
             />

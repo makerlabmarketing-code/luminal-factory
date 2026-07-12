@@ -1,10 +1,13 @@
 import { Suspense } from 'react';
 import StaffPortalContent from './StaffPortalContent';
+import { getAuthenticatedStaffPortalData } from '@/services/server/staffPortalData';
 
-export default function WorkerPortal() {
+export default async function WorkerPortal() {
+  const portalData = await getAuthenticatedStaffPortalData();
+
   return (
     <Suspense fallback={<div className="min-h-screen bg-slate-950 flex justify-center items-center text-slate-500 text-xs font-mono">Đang đồng bộ cổng Portal...</div>}>
-      <StaffPortalContent />
+      <StaffPortalContent workerData={portalData.employee} assignedBranchData={portalData.assignedBranch} />
     </Suspense>
   );
 }

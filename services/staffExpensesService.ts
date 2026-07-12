@@ -6,22 +6,16 @@ import {
   getCurrentMonthPeriod,
   parseCurrency,
 } from '@/services/financialService';
-import { getStaffEmployeeByToken } from '@/services/staffPortalService';
 
 export { formatCurrency, parseCurrency, getCurrentMonthPeriod };
 
 export async function getStaffExpensesData(params: {
-  token?: string | null;
   workerData?: Employee | null;
 }): Promise<{
   employee: Employee | null;
   expenses: FinancialLedgerEntry[];
 }> {
-  let employee = params.workerData || null;
-
-  if (!employee && params.token) {
-    employee = await getStaffEmployeeByToken(params.token);
-  }
+  const employee = params.workerData || null;
 
   if (!employee) {
     return {
@@ -32,7 +26,7 @@ export async function getStaffExpensesData(params: {
 
   const { data, error } = await supabase
     .from('financial_ledger')
-    .select('*')
+    .select('id, type, category, amount, bill_url, requested_by, is_paid, month_period')
     .eq('requested_by', employee.full_name)
     .order('id', { ascending: false });
 

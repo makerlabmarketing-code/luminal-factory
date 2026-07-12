@@ -1,7 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNotification } from '@/component/NotificationContext';
 import MonthPicker from '@/component/MonthPicker';
 import { businessMonthFromInstant, formatBusinessMonthInput } from '@/lib/business-date';
@@ -23,19 +22,15 @@ import {
 } from '@/services/staffExpensesService';
 
 interface StaffExpensesContentProps {
-  token?: string | null;
   workerData?: Employee | null;
 }
 
 const ITEMS_PER_PAGE = 10;
 
 export function StaffExpensesContent({
-  token: propsToken,
   workerData,
 }: StaffExpensesContentProps) {
   const { showToast } = useNotification();
-  const searchParams = useSearchParams();
-  const token = propsToken || searchParams.get('token');
 
   const [expenses, setExpenses] = useState<FinancialLedgerEntry[]>([]);
   const [worker, setWorker] = useState<Employee | null>(workerData || null);
@@ -53,15 +48,14 @@ export function StaffExpensesContent({
 
   const [currentPage, setCurrentPage] = useState(1);
 
-  const loadExpensesData = async () => {
-    if (!token && !workerData) {
+  const loadExpensesData = useCallback(async () => {
+    if (!workerData) {
       setLoading(false);
       return;
     }
 
     try {
       const expensesData = await getStaffExpensesData({
-        token,
         workerData,
       });
 
@@ -72,11 +66,11 @@ export function StaffExpensesContent({
     } finally {
       setLoading(false);
     }
-  };
+  }, [workerData]);
 
   useEffect(() => {
     loadExpensesData();
-  }, [token, workerData]);
+  }, [loadExpensesData]);
 
   const handleSubmitExpense = async () => {
     if (!worker) {

@@ -1,32 +1,25 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
 import { useNotification } from '@/component/NotificationContext';
 import { Briefcase, RefreshCcw, ShieldCheck } from 'lucide-react';
 import type { Facility } from '@/lib/types/facility';
 import type { Employee } from '@/lib/types/employee';
-import {
-  getShiftWageByTitle,
-  getStaffProfileData,
-  updateStaffProfile,
-} from '@/services/staffProfileService';
+import { getShiftWageByTitle, updateStaffProfile } from '@/services/staffProfileService';
 
 interface StaffProfileContentProps {
-  token?: string | null;
   workerData?: Employee | null;
+  assignedBranchData?: Facility | null;
 }
 
 export function StaffProfileContent({
-  token: propsToken,
   workerData,
+  assignedBranchData,
 }: StaffProfileContentProps) {
   const { showToast } = useNotification();
-  const searchParams = useSearchParams();
-  const token = propsToken || searchParams.get('token');
 
   const [worker, setWorker] = useState<Employee | null>(workerData || null);
-  const [assignedBranch, setAssignedBranch] = useState<Facility | null>(null);
+  const [assignedBranch] = useState<Facility | null>(assignedBranchData || null);
   const [loading, setLoading] = useState(!workerData);
 
   const [profilePhone, setProfilePhone] = useState('');
@@ -34,39 +27,18 @@ export function StaffProfileContent({
   const [profileBankAcc, setProfileBankAcc] = useState('');
 
   useEffect(() => {
-    const loadProfile = async () => {
-      setLoading(true);
-
-      try {
-        const profileData = await getStaffProfileData({
-          token,
-          workerData,
-        });
-
-        setWorker(profileData.employee);
-        setAssignedBranch(profileData.assignedBranch);
-
-        if (profileData.employee) {
-          setProfilePhone(profileData.employee.phone || '');
-          setProfileBankName(profileData.employee.bank_name || '');
-          setProfileBankAcc(profileData.employee.bank_account_number || '');
-        }
-      } catch (error) {
-        console.error(error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadProfile();
-  }, [token, workerData]);
+    setWorker(workerData || null);
+    setProfilePhone(workerData?.phone || '');
+    setProfileBankName(workerData?.bank_name || '');
+    setProfileBankAcc(workerData?.bank_account_number || '');
+    setLoading(false);
+  }, [workerData]);
 
   const handleSaveProfile = async () => {
     if (!worker) return;
 
     try {
       await updateStaffProfile({
-        employeeId: worker.id,
         phone: profilePhone,
         bankName: profileBankName,
         bankAccountNumber: profileBankAcc,

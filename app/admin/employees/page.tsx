@@ -38,10 +38,16 @@ export default function AdminEmployeesManagement() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const { data: facs } = await supabase.from('facilities').select('*').order('id', { ascending: true });
+      const { data: facs } = await supabase
+        .from('facilities')
+        .select('id, facility_name, name, code')
+        .order('id', { ascending: true });
       setBranches(facs || []);
 
-      const { data: emps } = await supabase.from('employees').select('*').order('id', { ascending: false });
+      const { data: emps } = await supabase
+        .from('employees')
+        .select('id, full_name, email, phone, address, cccd, drive_cccd, drive_contract, title, level, status, role, bank_name, bank_account_number, branch_code')
+        .order('id', { ascending: false });
       setEmployees(emps || []);
     } catch (e) { 
       console.error(e); 
@@ -115,13 +121,6 @@ export default function AdminEmployeesManagement() {
     });
   };
 
-  const handleCopyLink = (token: string) => {
-    if (!token) return showToast('Lỗi', 'Nhân sự này chưa được cấp token định danh!', 'error');
-    const url = `${window.location.origin}/staff/portal?token=${token}`;
-    navigator.clipboard.writeText(url);
-    showToast('Đã sao chép', 'Đã sao chép liên kết Cổng Portal gửi cho Nhân sự!', 'success');
-  };
-
   const filtered = employees.filter(e => {
     const matchText = (e.full_name || '').toLowerCase().includes(searchTerm.toLowerCase()) || (e.title || '').toLowerCase().includes(searchTerm.toLowerCase());
     
@@ -192,7 +191,7 @@ export default function AdminEmployeesManagement() {
                       </div>
                     </td>
                     <td className="p-4 font-mono text-slate-400">{emp.bank_name} - {emp.bank_account_number || '⏳ Chưa kê khai'}</td>
-                    <td className="p-4"><button onClick={() => handleCopyLink(emp.qr_token)} className="flex items-center gap-1.5 text-purple-400 hover:text-purple-300 font-mono text-[10px] bg-purple-950/30 border border-purple-800/30 px-2.5 py-1 rounded-lg transition">Link Portal</button></td>
+                    <td className="p-4"><span className="inline-flex items-center gap-1.5 text-slate-500 font-mono text-[10px] bg-slate-950/50 border border-slate-800 px-2.5 py-1 rounded-lg">Đăng nhập bằng email</span></td>
                     <td className="p-4 text-center space-x-1 font-sans">
                       <button onClick={() => handleOpenEdit(emp)} className="p-1.5 bg-slate-950 border border-slate-800 rounded-lg text-blue-400 hover:bg-slate-800 transition"><Edit2 className="w-3.5 h-3.5" /></button>
                       <button onClick={() => handleDelete(emp.id)} className="p-1.5 bg-slate-950 border border-slate-800 rounded-lg text-red-500 hover:bg-red-950/20 transition"><Trash2 className="w-3.5 h-3.5" /></button>

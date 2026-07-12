@@ -39,7 +39,7 @@ export default function DashboardCharts() {
         // Lấy toàn bộ dữ liệu hạch toán đã được xác nhận (is_paid = true)
         const { data: ledger } = await supabase
           .from('financial_ledger')
-          .select('*')
+          .select('id, type, category, amount, is_paid, month_period')
           .eq('is_paid', true);
 
         if (!ledger) return;

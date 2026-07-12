@@ -104,7 +104,7 @@ export default function AdminAttendanceManagement() {
       // 1. Truy vấn Metadata trung tâm để lấy danh mục Mức lương cơ bản
       const { data: metaData } = await supabase
         .from('system_metadata')
-        .select('*')
+        .select('id, name, data')
         .ilike('name', '%mức lương cơ bản%')
         .maybeSingle();
       
@@ -118,7 +118,9 @@ export default function AdminAttendanceManagement() {
       setEmployees(finalEmps);
       
       // 3. Truy vấn ca làm việc
-      const { data: sfs } = await supabase.from('shifts').select('*');
+      const { data: sfs } = await supabase
+        .from('shifts')
+        .select('id, shift_name, start_time, end_time');
       let finalShifts = (sfs || []) as Shift[];
       if (!finalShifts.some((shift) => shift.shift_name.includes('Tối'))) {
         finalShifts.push({ id: 't_mock', shift_name: 'Ca Tối', start_time: '18:00:00', end_time: '22:00:00' });
@@ -126,7 +128,10 @@ export default function AdminAttendanceManagement() {
       setShifts(finalShifts);
       
       // 4. Truy vấn lịch sử chấm công
-      const { data: atts } = await supabase.from('attendance').select('*').order('work_date', { ascending: false });
+      const { data: atts } = await supabase
+        .from('attendance')
+        .select('id, employee_id, employee_name, work_date, shift_name, check_in, check_out, total_hours, total_salary, status')
+        .order('work_date', { ascending: false });
       setAttendanceRecords((atts || []) as AttendanceRecord[]);
     } catch (error) { 
       console.error(error); 

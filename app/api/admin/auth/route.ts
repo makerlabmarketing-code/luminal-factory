@@ -1,24 +1,29 @@
 // app/api/admin/auth/route.ts
 import { NextResponse } from 'next/server';
+import { AuthFlowError, requireAdminEmployee } from '@/services/server/auth';
 
-export async function POST(request: Request) {
-  try {
-    const { passcode } = await request.json();
-
-    if (passcode === 'LF2026@') {
-      const response = NextResponse.json({ success: true, message: 'Xác thực thành công!' });
-      
-      // Thiết lập Session Cookie mã hóa ở tầng Server
-      response.cookies.set('hq_session_token', 'luminal_secure_encrypted_admin_session_2026', {
-        httpOnly: false, // Để tương thích mượt mà với môi trường ảo StackBlitz
-        path: '/',
-        maxAge: 60 * 60 * 2, // Hạn quyền truy cập trong 2 tiếng
-      });
-      return response;
-    }
-
-    return NextResponse.json({ error: 'Mật mã quản trị không chính xác!' }, { status: 401 });
-  } catch (error) {
-    return NextResponse.json({ error: 'Lỗi máy chủ hệ thống!' }, { status: 500 });
+function toErrorResponse(error: unknown) {
+  if (error instanceof AuthFlowError) {
+    return NextResponse.json({ error: error.message }, { status: error.status });
   }
+
+  return NextResponse.json({ error: 'Không thể xác minh phiên quản trị.' }, { status: 500 });
+}
+
+async function verifyAdminSession() {
+  try {
+    await requireAdminEmployee();
+
+    return NextResponse.json({ success: true, message: 'Phiên quản trị hợp lệ.' });
+  } catch (error) {
+    return toErrorResponse(error);
+  }
+}
+
+export async function GET() {
+  return verifyAdminSession();
+}
+
+export async function POST() {
+  return verifyAdminSession();
 }

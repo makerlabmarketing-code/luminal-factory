@@ -87,7 +87,9 @@ export default function AdminFinancialLedger() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const { data: emps } = await supabase.from('employees').select('*');
+      const { data: emps } = await supabase
+        .from('employees')
+        .select('id, full_name, bank_name, bank_account_number');
       setEmployees(emps || []);
       if (emps && emps.length > 0 && !reporter) setReporter(emps[0].full_name);
 
@@ -109,7 +111,11 @@ export default function AdminFinancialLedger() {
       const { data: setAccount } = await supabase.from('system_settings').select('value').eq('key', 'company_bank_account').maybeSingle();
       if (setAccount) setCompanyBankAccount(setAccount.value);
 
-      const { data: ledgers } = await supabase.from('financial_ledger').select('*').eq('month_period', selectedMonth).order('id', { ascending: false });
+      const { data: ledgers } = await supabase
+        .from('financial_ledger')
+        .select('id, type, sub_type, category, amount, bill_url, requested_by, is_paid, month_period, expense_source')
+        .eq('month_period', selectedMonth)
+        .order('id', { ascending: false });
       setLedger(ledgers || []);
     } catch (e) { 
       console.error(e); 

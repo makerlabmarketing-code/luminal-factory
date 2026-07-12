@@ -1,24 +1,30 @@
 // app/api/attendance/check-out/route.ts
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/ultis/supabase/server';
+import { AuthFlowError, requireAuthenticatedEmployee } from '@/services/server/auth';
+
+function toErrorResponse(error: unknown) {
+  if (error instanceof AuthFlowError) {
+    return NextResponse.json({ error: error.message }, { status: error.status });
+  }
+
+  return NextResponse.json(
+    { error: 'Lỗi máy chủ khi tính toán giờ làm việc!' },
+    { status: 500 }
+  );
+}
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const { employeeId, userLat, userLng } = body;
-
-    if (!employeeId) {
-      return NextResponse.json(
-        { error: 'Thiếu thông tin xác thực nhân sự!' },
-        { status: 400 }
-      );
-    }
+    await request.json().catch(() => null);
+    const authContext = await requireAuthenticatedEmployee();
+    const supabase = await createClient();
 
     // 1. Tìm bản ghi Check-in gần nhất trong ngày chưa có thời gian Check-out của Nhân sự này
     const { data: currentLog, error: logError } = await supabase
       .from('attendance_logs')
       .select('*')
-      .eq('employee_id', employeeId)
+      .eq('employee_id', authContext.employee.id)
       .is('check_out_time', null)
       .order('check_in_time', { ascending: false })
       .maybeSingle();
@@ -56,7 +62,7 @@ export async function POST(request: Request) {
     const { data: employee } = await supabase
       .from('employees')
       .select('hourly_rate')
-      .eq('id', employeeId)
+      .eq('id', authContext.employee.id)
       .single();
 
     const hourlyRate = employee?.hourly_rate || 30000;
@@ -71,7 +77,8 @@ export async function POST(request: Request) {
         earnings_today: totalEarningsToday,
         status: 'COMPLETED',
       })
-      .eq('id', currentLog.id);
+      .eq('id', currentLog.id)
+      .eq('employee_id', authContext.employee.id);
 
     if (updateError) throw updateError;
 
@@ -80,10 +87,6 @@ export async function POST(request: Request) {
       message: `Check-out thành công! Bạn đã làm việc được ${hoursWorked} giờ. Số tiền tạm tính hôm nay: ${totalEarningsToday.toLocaleString()} đ.`,
     });
   } catch (error) {
-    console.error('Check-out System Error:', error);
-    return NextResponse.json(
-      { error: 'Lỗi máy chủ khi tính toán giờ làm việc!' },
-      { status: 500 }
-    );
+    return toErrorResponse(error);
   }
 }
