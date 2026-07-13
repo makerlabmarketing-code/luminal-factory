@@ -2,9 +2,11 @@ import { describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
+  ADMIN_LOGIN_STEP_MESSAGES,
   ADMIN_LOGIN_MESSAGES,
   navigateToAdminDashboard,
   submitAdminLogin,
+  verifyAdminSessionWithApi,
 } from '../utils/auth/admin-login';
 
 function verificationResponse(
@@ -26,17 +28,40 @@ describe('admin login flow', () => {
       error: null,
     });
 
+    const verifyAdminSession = vi.fn().mockResolvedValue(verificationResponse(true, 200));
+
     await submitAdminLogin({
       auth: { signInWithPassword },
       email: ' admin@luminalfactory.com ',
       password: 'mat-khau',
-      verifyAdminSession: vi.fn().mockResolvedValue(verificationResponse(true, 200)),
+      verifyAdminSession,
     });
 
     expect(signInWithPassword).toHaveBeenCalledWith({
       email: 'admin@luminalfactory.com',
       password: 'mat-khau',
     });
+    expect(verifyAdminSession).toHaveBeenCalledTimes(1);
+  });
+
+  it('calls the admin verification endpoint with the required fetch contract', async () => {
+    const originalFetch = globalThis.fetch;
+    const fetchMock = vi.fn().mockResolvedValue(verificationResponse(true, 200));
+    globalThis.fetch = fetchMock;
+
+    await verifyAdminSessionWithApi();
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith('/api/admin/auth', {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+      },
+      credentials: 'same-origin',
+      cache: 'no-store',
+    });
+
+    globalThis.fetch = originalFetch;
   });
 
   it('keeps the admin login button in a loading state while submitting', () => {
@@ -50,6 +75,7 @@ describe('admin login flow', () => {
   });
 
   it('returns a neutral message when the password is wrong', async () => {
+    const verifyAdminSession = vi.fn();
     const result = await submitAdminLogin({
       auth: {
         signInWithPassword: vi.fn().mockResolvedValue({
@@ -59,13 +85,14 @@ describe('admin login flow', () => {
       },
       email: 'admin@luminalfactory.com',
       password: 'sai-mat-khau',
-      verifyAdminSession: vi.fn(),
+      verifyAdminSession,
     });
 
     expect(result).toEqual({
       ok: false,
       message: ADMIN_LOGIN_MESSAGES.invalidCredentials,
     });
+    expect(verifyAdminSession).not.toHaveBeenCalled();
   });
 
   it('requires both session and user after sign-in succeeds', async () => {
@@ -132,6 +159,7 @@ describe('admin login flow', () => {
   });
 
   it('redirects a valid ADMIN to the dashboard', async () => {
+    const onStep = vi.fn();
     const result = await submitAdminLogin({
       auth: {
         signInWithPassword: vi.fn().mockResolvedValue({
@@ -142,12 +170,17 @@ describe('admin login flow', () => {
       email: 'admin@luminalfactory.com',
       password: 'mat-khau',
       verifyAdminSession: vi.fn().mockResolvedValue(verificationResponse(true, 200)),
+      onStep,
     });
 
     expect(result).toEqual({
       ok: true,
       redirectPath: '/admin/dashboard',
     });
+    expect(onStep).toHaveBeenNthCalledWith(1, 'sign_in_started');
+    expect(onStep).toHaveBeenNthCalledWith(2, 'sign_in_succeeded');
+    expect(onStep).toHaveBeenNthCalledWith(3, 'admin_verify_started');
+    expect(onStep).toHaveBeenNthCalledWith(4, 'admin_verify_succeeded');
   });
 
   it('uses document navigation to avoid stale admin dashboard payloads', () => {
@@ -209,6 +242,19 @@ describe('admin login flow', () => {
       ok: false,
       message: ADMIN_LOGIN_MESSAGES.serverError,
     });
+  });
+
+  it('keeps a clear diagnostic state while successful verification navigates', () => {
+    const source = readFileSync(
+      join(__dirname, '../app/admin/AdminLoginForm.tsx'),
+      'utf8'
+    );
+
+    expect(source).toMatch(/data-auth-step=\{authStep\}/);
+    expect(source).toMatch(/setAuthStep\('navigation_started'\)/);
+    expect(ADMIN_LOGIN_STEP_MESSAGES.navigation_started).toBe(
+      'Đang chuyển tới bảng điều khiển.'
+    );
   });
 
   it('prevents repeated submit while a request is running', () => {

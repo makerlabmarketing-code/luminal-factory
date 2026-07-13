@@ -199,6 +199,7 @@ Không xóa lịch sử giai đoạn đã hoàn thành.
 - Password setup: PASS
 - Supabase signIn request: PASS
 - Admin session/navigation: BỊ CHẶN
+- Live verification 2026-07-13: production bundle đang phục vụ không chứa `POST /api/admin/auth` hoặc full document navigation; cần deploy lại bundle mới rồi test lại.
 - User không có quyền bị chặn khỏi khu vực quản trị bằng tài khoản thật: CHƯA XÁC MINH
 
 ### Kết luận Part 5
