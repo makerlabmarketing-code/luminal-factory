@@ -3,6 +3,10 @@ import AdminLoginForm from './AdminLoginForm';
 import AdminShell from './AdminShell';
 import { getServerAuthContext, hasAdminAccess } from '@/services/server/auth';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const fetchCache = 'force-no-store';
+
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const authContext = await getServerAuthContext();
 

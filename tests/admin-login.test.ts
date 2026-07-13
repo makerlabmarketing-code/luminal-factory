@@ -12,12 +12,17 @@ import {
 function verificationResponse(
   ok: boolean,
   status: number,
-  error?: string
+  error?: string,
+  code?: string
 ) {
   return {
     ok,
     status,
-    json: vi.fn().mockResolvedValue(error ? { error } : {}),
+    json: vi.fn().mockResolvedValue({
+      ...(error ? { error } : {}),
+      ...(code ? { code } : {}),
+      status,
+    }),
   };
 }
 
@@ -57,7 +62,7 @@ describe('admin login flow', () => {
       headers: {
         Accept: 'application/json',
       },
-      credentials: 'same-origin',
+      credentials: 'include',
       cache: 'no-store',
     });
 
@@ -95,6 +100,35 @@ describe('admin login flow', () => {
     expect(verifyAdminSession).not.toHaveBeenCalled();
   });
 
+  it('returns the same neutral message for auth network and rate-limit errors', async () => {
+    const cases = [
+      new Error('network error'),
+      new Error('rate limit exceeded'),
+      new Error('invalid login credentials'),
+    ];
+
+    for (const signInError of cases) {
+      const verifyAdminSession = vi.fn();
+      const result = await submitAdminLogin({
+        auth: {
+          signInWithPassword: vi.fn().mockResolvedValue({
+            data: null,
+            error: signInError,
+          }),
+        },
+        email: 'admin@luminalfactory.com',
+        password: 'mat-khau',
+        verifyAdminSession,
+      });
+
+      expect(result).toEqual({
+        ok: false,
+        message: ADMIN_LOGIN_MESSAGES.invalidCredentials,
+      });
+      expect(verifyAdminSession).not.toHaveBeenCalled();
+    }
+  });
+
   it('requires both session and user after sign-in succeeds', async () => {
     const result = await submitAdminLogin({
       auth: {
@@ -127,7 +161,12 @@ describe('admin login flow', () => {
       verifyAdminSession: vi
         .fn()
         .mockResolvedValue(
-          verificationResponse(false, 403, ADMIN_LOGIN_MESSAGES.missingEmployee)
+          verificationResponse(
+            false,
+            404,
+            ADMIN_LOGIN_MESSAGES.missingEmployee,
+            'missing_employee'
+          )
         ),
     });
 
@@ -180,25 +219,26 @@ describe('admin login flow', () => {
     expect(onStep).toHaveBeenNthCalledWith(1, 'sign_in_started');
     expect(onStep).toHaveBeenNthCalledWith(2, 'sign_in_succeeded');
     expect(onStep).toHaveBeenNthCalledWith(3, 'admin_verify_started');
-    expect(onStep).toHaveBeenNthCalledWith(4, 'admin_verify_succeeded');
+    expect(onStep).toHaveBeenNthCalledWith(4, 'admin_verify_response_status', 200);
+    expect(onStep).toHaveBeenNthCalledWith(5, 'admin_verify_succeeded');
   });
 
   it('uses document navigation to avoid stale admin dashboard payloads', () => {
     const originalWindow = globalThis.window;
-    const assign = vi.fn();
+    const replace = vi.fn();
 
     Object.defineProperty(globalThis, 'window', {
       configurable: true,
       value: {
         location: {
-          assign,
+          replace,
         },
       },
     });
 
     navigateToAdminDashboard('/admin/dashboard');
 
-    expect(assign).toHaveBeenCalledWith('/admin/dashboard');
+    expect(replace).toHaveBeenCalledWith('/admin/dashboard');
 
     Object.defineProperty(globalThis, 'window', {
       configurable: true,
@@ -240,6 +280,25 @@ describe('admin login flow', () => {
 
     expect(result).toEqual({
       ok: false,
+      message: ADMIN_LOGIN_MESSAGES.unconfirmedSession,
+    });
+  });
+
+  it('reports a server error for admin verification 500 responses', async () => {
+    const result = await submitAdminLogin({
+      auth: {
+        signInWithPassword: vi.fn().mockResolvedValue({
+          data: { session: { id: 'session' }, user: { id: 'auth-user-id' } },
+          error: null,
+        }),
+      },
+      email: 'admin@luminalfactory.com',
+      password: 'mat-khau',
+      verifyAdminSession: vi.fn().mockResolvedValue(verificationResponse(false, 500)),
+    });
+
+    expect(result).toEqual({
+      ok: false,
       message: ADMIN_LOGIN_MESSAGES.serverError,
     });
   });
@@ -252,9 +311,21 @@ describe('admin login flow', () => {
 
     expect(source).toMatch(/data-auth-step=\{authStep\}/);
     expect(source).toMatch(/setAuthStep\('navigation_started'\)/);
+    expect(source).toMatch(/authStep === 'admin_verify_response_status'/);
     expect(ADMIN_LOGIN_STEP_MESSAGES.navigation_started).toBe(
       'Đang chuyển tới bảng điều khiển.'
     );
+  });
+
+  it('only navigates after admin verification succeeds', () => {
+    const source = readFileSync(
+      join(__dirname, '../app/admin/AdminLoginForm.tsx'),
+      'utf8'
+    );
+
+    expect(source).toMatch(/if \(!loginResult\.ok\) \{/);
+    expect(source).toMatch(/return;\n    }\n\n    try \{/);
+    expect(source).toMatch(/navigateToAdminDashboard\(loginResult\.redirectPath\)/);
   });
 
   it('prevents repeated submit while a request is running', () => {
@@ -272,12 +343,26 @@ describe('admin login flow', () => {
       join(__dirname, '../app/api/admin/auth/route.ts'),
       'utf8'
     );
+    const serverAuthSource = readFileSync(
+      join(__dirname, '../services/server/auth.ts'),
+      'utf8'
+    );
     const layoutSource = readFileSync(
       join(__dirname, '../app/admin/layout.tsx'),
       'utf8'
     );
 
     expect(routeSource).toMatch(/Cache-Control['"], ['"]no-store/);
+    expect(routeSource).toMatch(/export async function POST/);
+    expect(routeSource).toMatch(/requireAdminEmployee\(\)/);
+    expect(routeSource).not.toMatch(/request\.json\(/);
+    expect(serverAuthSource).toMatch(/supabase\.auth\.getUser\(\)/);
+    expect(serverAuthSource).toMatch(/\.eq\('auth_user_id', user\.id\)/);
+    expect(serverAuthSource).toMatch(/role === 'ADMIN'/);
+    expect(serverAuthSource).toMatch(/isActiveEmployee\(serverEmployee\)/);
+    expect(serverAuthSource).toMatch(/hasAdminAccess\(authContext\.employee\)/);
+    expect(routeSource).toMatch(/status: 200/);
+    expect(routeSource).toMatch(/code: 'admin_verified'/);
     expect(layoutSource).toMatch(/dynamic = 'force-dynamic'/);
     expect(layoutSource).toMatch(/revalidate = 0/);
     expect(layoutSource).toMatch(/fetchCache = 'force-no-store'/);
@@ -292,5 +377,35 @@ describe('admin login flow', () => {
     expect(layoutSource).toMatch(/if \(!authContext\)/);
     expect(layoutSource).toMatch(/if \(!hasAdminAccess\(authContext\.employee\)\)/);
     expect(layoutSource).toMatch(/return <AdminShell>\{children\}<\/AdminShell>/);
+  });
+
+  it('keeps the Supabase SSR browser/server/middleware cookie contract aligned', () => {
+    const browserClientSource = readFileSync(
+      join(__dirname, '../utils/supabase/client.ts'),
+      'utf8'
+    );
+    const serverClientSource = readFileSync(
+      join(__dirname, '../utils/supabase/server.ts'),
+      'utf8'
+    );
+    const middlewareClientSource = readFileSync(
+      join(__dirname, '../utils/supabase/middleware.ts'),
+      'utf8'
+    );
+    const loginFormSource = readFileSync(
+      join(__dirname, '../app/admin/AdminLoginForm.tsx'),
+      'utf8'
+    );
+
+    expect(browserClientSource).toMatch(/createBrowserClient\(getSupabaseUrl\(\), getSupabasePublicKey\(\)\)/);
+    expect(serverClientSource).toMatch(/createServerClient\(getSupabaseUrl\(\), getSupabasePublicKey\(\)/);
+    expect(middlewareClientSource).toMatch(/createServerClient\(getSupabaseUrl\(\), getSupabasePublicKey\(\)/);
+    expect(serverClientSource).toMatch(/getAll\(\)/);
+    expect(serverClientSource).toMatch(/setAll\(cookiesToSet\)/);
+    expect(middlewareClientSource).toMatch(/request\.cookies\.getAll\(\)/);
+    expect(middlewareClientSource).toMatch(/supabaseResponse\.cookies\.set/);
+    expect(loginFormSource).toMatch(/useMemo\(\(\) => createClient\(\), \[\]\)/);
+    expect(loginFormSource).not.toMatch(/import \{ supabase \}/);
+    expect(loginFormSource).not.toMatch(/localStorage/);
   });
 });

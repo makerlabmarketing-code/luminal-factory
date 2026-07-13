@@ -1,11 +1,17 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
+import { FormEvent, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { KeyRound, RefreshCcw } from 'lucide-react';
-import { supabase } from '@/utils/supabase/client';
-import { ADMIN_DASHBOARD_PATH } from '@/utils/auth/flow';
+import { createClient } from '@/utils/supabase/client';
+import {
+  ADMIN_LOGIN_STEP_MESSAGES,
+  AdminLoginStep,
+  navigateToAdminDashboard,
+  submitAdminLogin,
+  verifyAdminSessionWithApi,
+} from '@/utils/auth/admin-login';
 
 interface AdminLoginFormProps {
   message?: string;
@@ -13,30 +19,49 @@ interface AdminLoginFormProps {
 
 export default function AdminLoginForm({ message }: AdminLoginFormProps) {
   const router = useRouter();
+  const supabase = useMemo(() => createClient(), []);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState(message || '');
   const [checking, setChecking] = useState(false);
+  const [authStep, setAuthStep] = useState<AdminLoginStep | null>(null);
+  const [authStepStatus, setAuthStepStatus] = useState<number | null>(null);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (checking) return;
+
     setChecking(true);
     setError('');
+    setAuthStep(null);
+    setAuthStepStatus(null);
 
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
+    const loginResult = await submitAdminLogin({
+      auth: supabase.auth,
+      email,
       password,
+      verifyAdminSession: verifyAdminSessionWithApi,
+      onStep: (step, status) => {
+        setAuthStep(step);
+        setAuthStepStatus(status ?? null);
+      },
     });
 
-    if (signInError) {
-      setError('Email hoặc mật khẩu chưa đúng.');
+    if (!loginResult.ok) {
+      setError(loginResult.message);
       setChecking(false);
       return;
     }
 
-    router.replace(ADMIN_DASHBOARD_PATH);
-    router.refresh();
-    setChecking(false);
+    try {
+      setAuthStep('navigation_started');
+      router.replace(loginResult.redirectPath);
+      router.refresh();
+      navigateToAdminDashboard(loginResult.redirectPath);
+    } catch {
+      setError('Không thể chuyển tới bảng điều khiển. Vui lòng thử lại.');
+      setChecking(false);
+    }
   };
 
   return (
@@ -71,10 +96,23 @@ export default function AdminLoginForm({ message }: AdminLoginFormProps) {
             required
           />
           {error && <p className="text-[11px] text-red-400 text-center font-bold">{error}</p>}
+          {checking && authStep && !error && (
+            <p className="text-[11px] text-slate-400 text-center font-bold" data-auth-step={authStep}>
+              {ADMIN_LOGIN_STEP_MESSAGES[authStep]}
+              {authStep === 'admin_verify_response_status' && authStepStatus ? ` (${authStepStatus})` : ''}
+            </p>
+          )}
         </div>
 
-        <button type="submit" disabled={checking} className="w-full bg-blue-600 hover:bg-blue-700 font-bold text-xs p-3 rounded-xl transition flex items-center justify-center gap-1">
-          {checking ? <RefreshCcw className="w-3.5 h-3.5 animate-spin" /> : 'Đăng nhập'}
+        <button type="submit" disabled={checking} className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-60 font-bold text-xs p-3 rounded-xl transition flex items-center justify-center gap-1">
+          {checking ? (
+            <>
+              <RefreshCcw className="w-3.5 h-3.5 animate-spin" />
+              Đang đăng nhập...
+            </>
+          ) : (
+            'Đăng nhập'
+          )}
         </button>
 
         <Link href="/auth/forgot-password" className="block text-center text-xs text-slate-400 hover:text-slate-100">

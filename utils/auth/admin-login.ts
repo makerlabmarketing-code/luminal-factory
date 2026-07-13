@@ -2,15 +2,17 @@ import { ADMIN_DASHBOARD_PATH } from './flow';
 
 export const ADMIN_LOGIN_MESSAGES = {
   invalidCredentials: 'Email hoặc mật khẩu chưa đúng.',
+  unconfirmedSession: 'Phiên đăng nhập chưa được xác nhận. Vui lòng thử lại.',
   missingEmployee: 'Tài khoản chưa được cấp quyền sử dụng hệ thống.',
   forbidden: 'Bạn không có quyền truy cập khu vực quản trị.',
-  serverError: 'Không thể xác minh quyền quản trị. Vui lòng thử lại.',
+  serverError: 'Không thể xác minh quyền quản trị.',
 } as const;
 
 export const ADMIN_LOGIN_STEP_MESSAGES = {
   sign_in_started: 'Đang đăng nhập...',
   sign_in_succeeded: 'Đã xác thực tài khoản.',
   admin_verify_started: 'Đang xác minh quyền quản trị.',
+  admin_verify_response_status: 'Đã nhận phản hồi xác minh quản trị.',
   admin_verify_succeeded: 'Đã xác minh quyền quản trị.',
   navigation_started: 'Đang chuyển tới bảng điều khiển.',
 } as const;
@@ -45,6 +47,8 @@ interface AdminSessionVerificationResponse {
   status: number;
   json(): Promise<{
     error?: string;
+    code?: string;
+    status?: number;
   }>;
 }
 
@@ -53,15 +57,22 @@ interface AdminLoginInput {
   email: string;
   password: string;
   verifyAdminSession: () => Promise<AdminSessionVerificationResponse>;
-  onStep?: (step: AdminLoginStep) => void;
+  onStep?: (step: AdminLoginStep, status?: number) => void;
 }
 
-function toAdminVerificationMessage(status: number, errorMessage?: string): string {
-  if (status === 401) return ADMIN_LOGIN_MESSAGES.serverError;
+function toAdminVerificationMessage(
+  status: number,
+  errorMessage?: string,
+  errorCode?: string
+): string {
+  if (status === 401) return ADMIN_LOGIN_MESSAGES.unconfirmedSession;
+  if (status === 404 || errorCode === 'missing_employee') {
+    return ADMIN_LOGIN_MESSAGES.missingEmployee;
+  }
   if (errorMessage === ADMIN_LOGIN_MESSAGES.missingEmployee) {
     return ADMIN_LOGIN_MESSAGES.missingEmployee;
   }
-  if (errorMessage === ADMIN_LOGIN_MESSAGES.forbidden) {
+  if (status === 403 || errorMessage === ADMIN_LOGIN_MESSAGES.forbidden) {
     return ADMIN_LOGIN_MESSAGES.forbidden;
   }
 
@@ -74,13 +85,13 @@ export async function verifyAdminSessionWithApi(): Promise<AdminSessionVerificat
     headers: {
       Accept: 'application/json',
     },
-    credentials: 'same-origin',
+    credentials: 'include',
     cache: 'no-store',
   });
 }
 
 export function navigateToAdminDashboard(redirectPath: string): void {
-  window.location.assign(redirectPath);
+  window.location.replace(redirectPath);
 }
 
 export async function submitAdminLogin({
@@ -108,6 +119,7 @@ export async function submitAdminLogin({
 
   try {
     const verificationResponse = await verifyAdminSession();
+    onStep?.('admin_verify_response_status', verificationResponse.status);
     if (verificationResponse.ok) {
       onStep?.('admin_verify_succeeded');
       return {
@@ -122,7 +134,8 @@ export async function submitAdminLogin({
       ok: false,
       message: toAdminVerificationMessage(
         verificationResponse.status,
-        verificationPayload.error
+        verificationPayload.error,
+        verificationPayload.code
       ),
     };
   } catch {

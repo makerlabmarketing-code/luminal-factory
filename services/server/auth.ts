@@ -38,6 +38,21 @@ export interface AuthContext {
   employee: ServerEmployee;
 }
 
+type AuthContextLookupResult =
+  | {
+      ok: true;
+      authContext: AuthContext;
+    }
+  | {
+      ok: false;
+      reason:
+        | 'missing_session'
+        | 'missing_email'
+        | 'missing_employee'
+        | 'inactive_employee'
+        | 'server_error';
+    };
+
 export const STAFF_EMPLOYEE_SELECT =
   'id, auth_user_id, employee_id, full_name, email, title, status, role, is_manager, is_active, branch, branch_code, phone, bank_name, bank_account_number, hourly_rate, base_salary_per_hour';
 
@@ -75,15 +90,15 @@ export function toPublicStaffEmployee(employee: ServerEmployee) {
   };
 }
 
-export async function getServerAuthContext(): Promise<AuthContext | null> {
+async function getServerAuthContextLookup(): Promise<AuthContextLookupResult> {
   const supabase = await createClient();
   const { data: userResult, error: userError } = await supabase.auth.getUser();
   const user = userResult.user;
 
-  if (userError || !user) return null;
+  if (userError || !user) return { ok: false, reason: 'missing_session' };
 
   const email = user.email || null;
-  if (!email) return null;
+  if (!email) return { ok: false, reason: 'missing_email' };
 
   const { data: employee, error: employeeError } = await supabase
     .from('employees')
@@ -91,34 +106,55 @@ export async function getServerAuthContext(): Promise<AuthContext | null> {
     .eq('auth_user_id', user.id)
     .maybeSingle();
 
-  if (employeeError || !employee) return null;
+  if (employeeError) return { ok: false, reason: 'server_error' };
+  if (!employee) return { ok: false, reason: 'missing_employee' };
+
+  const serverEmployee = employee as ServerEmployee;
+  if (!isActiveEmployee(serverEmployee)) return { ok: false, reason: 'inactive_employee' };
 
   return {
-    authUserId: user.id,
-    email,
-    employee: employee as ServerEmployee,
+    ok: true,
+    authContext: {
+      authUserId: user.id,
+      email,
+      employee: serverEmployee,
+    },
   };
 }
 
-export async function requireAuthenticatedEmployee(): Promise<AuthContext> {
-  const authContext = await getServerAuthContext();
+export async function getServerAuthContext(): Promise<AuthContext | null> {
+  const result = await getServerAuthContextLookup();
 
-  if (!authContext) {
+  return result.ok ? result.authContext : null;
+}
+
+export async function requireAuthenticatedEmployee(): Promise<AuthContext> {
+  const result = await getServerAuthContextLookup();
+
+  if (!result.ok) {
+    if (result.reason === 'missing_employee') {
+      throw new AuthFlowError(404, 'Tài khoản chưa được cấp quyền sử dụng hệ thống.');
+    }
+
+    if (result.reason === 'inactive_employee') {
+      throw new AuthFlowError(403, 'Tài khoản nhân sự chưa được phép truy cập.');
+    }
+
+    if (result.reason === 'server_error') {
+      throw new AuthFlowError(500, 'Không thể xác minh phiên đăng nhập.');
+    }
+
     throw new AuthFlowError(401, 'Vui lòng đăng nhập để tiếp tục.');
   }
 
-  if (!isActiveEmployee(authContext.employee)) {
-    throw new AuthFlowError(403, 'Tài khoản nhân sự chưa được phép truy cập.');
-  }
-
-  return authContext;
+  return result.authContext;
 }
 
 export async function requireAdminEmployee(): Promise<AuthContext> {
   const authContext = await requireAuthenticatedEmployee();
 
   if (!hasAdminAccess(authContext.employee)) {
-    throw new AuthFlowError(403, 'Bạn không có quyền quản trị.');
+    throw new AuthFlowError(403, 'Bạn không có quyền truy cập khu vực quản trị.');
   }
 
   return authContext;
