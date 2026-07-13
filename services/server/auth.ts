@@ -14,6 +14,7 @@ export class AuthFlowError extends Error {
 
 export interface ServerEmployee {
   id: number | string;
+  auth_user_id?: string | null;
   employee_id?: number | string | null;
   full_name: string;
   email?: string | null;
@@ -38,7 +39,7 @@ export interface AuthContext {
 }
 
 export const STAFF_EMPLOYEE_SELECT =
-  'id, employee_id, full_name, email, title, status, role, is_manager, is_active, branch, branch_code, phone, bank_name, bank_account_number, hourly_rate, base_salary_per_hour';
+  'id, auth_user_id, employee_id, full_name, email, title, status, role, is_manager, is_active, branch, branch_code, phone, bank_name, bank_account_number, hourly_rate, base_salary_per_hour';
 
 function normalizeRole(role?: string | null): string {
   return (role || '').trim().toUpperCase();
@@ -87,7 +88,7 @@ export async function getServerAuthContext(): Promise<AuthContext | null> {
   const { data: employee, error: employeeError } = await supabase
     .from('employees')
     .select(STAFF_EMPLOYEE_SELECT)
-    .eq('email', email)
+    .eq('auth_user_id', user.id)
     .maybeSingle();
 
   if (employeeError || !employee) return null;

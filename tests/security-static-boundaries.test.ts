@@ -107,11 +107,42 @@ describe('static security boundaries', () => {
   it('checks admin authorization on the server instead of trusting frontend role state', () => {
     const adminLayout = readFileSync(join(repositoryRoot, 'app/admin/layout.tsx'), 'utf8');
     const adminAuthRoute = readFileSync(join(repositoryRoot, 'app/api/admin/auth/route.ts'), 'utf8');
+    const serverAuth = readFileSync(join(repositoryRoot, 'services/server/auth.ts'), 'utf8');
 
     expect(adminLayout).toMatch(/getServerAuthContext/);
     expect(adminLayout).toMatch(/hasAdminAccess/);
     expect(adminAuthRoute).toMatch(/requireAdminEmployee/);
     expect(adminAuthRoute).not.toMatch(/passcode/);
+    expect(serverAuth).toMatch(/\.eq\(['"]auth_user_id['"],\s*user\.id\)/);
+    expect(serverAuth).toMatch(/role === 'ADMIN'/);
+  });
+
+  it('keeps public auth callback token-safe and internal-redirect only', () => {
+    const callbackRoute = readFileSync(
+      join(repositoryRoot, 'app/auth/callback/route.ts'),
+      'utf8'
+    );
+
+    expect(callbackRoute).toMatch(/exchangeCodeForSession/);
+    expect(callbackRoute).toMatch(/verifyOtp/);
+    expect(callbackRoute).toMatch(/parseAuthCallbackAction/);
+    expect(callbackRoute).not.toMatch(/console\.(log|debug|info|warn|error)/);
+  });
+
+  it('uses neutral auth messages for login and password reset', () => {
+    const adminLogin = readFileSync(join(repositoryRoot, 'app/admin/AdminLoginForm.tsx'), 'utf8');
+    const staffLogin = readFileSync(join(repositoryRoot, 'app/staff/StaffLoginForm.tsx'), 'utf8');
+    const forgotPassword = readFileSync(
+      join(repositoryRoot, 'app/auth/forgot-password/ForgotPasswordForm.tsx'),
+      'utf8'
+    );
+
+    expect(adminLogin).toMatch(/Email hoặc mật khẩu chưa đúng\./);
+    expect(staffLogin).toMatch(/Email hoặc mật khẩu chưa đúng\./);
+    expect(forgotPassword).toMatch(
+      /Nếu email tồn tại trong hệ thống, hướng dẫn đặt lại mật khẩu sẽ được gửi\./
+    );
+    expect(forgotPassword).toMatch(/resetPasswordForEmail/);
   });
 
   it('does not expose privileged admin credentials through public env names', () => {

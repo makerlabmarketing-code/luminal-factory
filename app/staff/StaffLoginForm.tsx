@@ -1,9 +1,11 @@
 'use client';
 
 import { FormEvent, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { RefreshCcw, User } from 'lucide-react';
 import { supabase } from '@/utils/supabase/client';
+import { STAFF_PORTAL_PATH } from '@/utils/auth/flow';
 
 interface StaffLoginFormProps {
   message?: string;
@@ -27,11 +29,12 @@ export default function StaffLoginForm({ message }: StaffLoginFormProps) {
     });
 
     if (signInError) {
-      setError('Email hoặc mật khẩu không hợp lệ.');
+      setError('Email hoặc mật khẩu chưa đúng.');
       setChecking(false);
       return;
     }
 
+    router.replace(STAFF_PORTAL_PATH);
     router.refresh();
     setChecking(false);
   };
@@ -43,7 +46,7 @@ export default function StaffLoginForm({ message }: StaffLoginFormProps) {
           <div className="w-12 h-12 bg-purple-500/10 border border-purple-500/20 text-purple-400 rounded-2xl flex items-center justify-center mx-auto">
             <User className="w-5 h-5" />
           </div>
-          <h3 className="text-sm font-black uppercase tracking-wide">Đăng nhập nhân sự</h3>
+          <h3 className="text-sm font-bold">Đăng nhập nhân sự</h3>
         </div>
 
         <div className="space-y-2">
@@ -70,9 +73,13 @@ export default function StaffLoginForm({ message }: StaffLoginFormProps) {
           {error && <p className="text-[11px] text-red-400 text-center font-bold">{error}</p>}
         </div>
 
-        <button type="submit" disabled={checking} className="w-full bg-purple-600 hover:bg-purple-700 p-3 rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1">
-          {checking ? <RefreshCcw className="w-3.5 h-3.5 animate-spin" /> : 'Vào cổng nhân sự'}
+        <button type="submit" disabled={checking} className="w-full bg-purple-600 hover:bg-purple-700 p-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1">
+          {checking ? <RefreshCcw className="w-3.5 h-3.5 animate-spin" /> : 'Đăng nhập'}
         </button>
+
+        <Link href="/auth/forgot-password" className="block text-center text-xs text-slate-400 hover:text-slate-100">
+          Quên mật khẩu?
+        </Link>
       </form>
     </div>
   );

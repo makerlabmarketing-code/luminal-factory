@@ -9,7 +9,7 @@ export const createClient = (request: NextRequest) => {
     },
   });
 
-  createServerClient(getSupabaseUrl(), getSupabasePublicKey(), {
+  const supabase = createServerClient(getSupabaseUrl(), getSupabasePublicKey(), {
     cookies: {
       getAll() {
         return request.cookies.getAll();
@@ -26,5 +26,5 @@ export const createClient = (request: NextRequest) => {
     },
   });
 
-  return supabaseResponse;
+  return { supabase, response: supabaseResponse };
 };

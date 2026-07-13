@@ -1,9 +1,11 @@
 'use client';
 
 import { FormEvent, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { KeyRound, RefreshCcw } from 'lucide-react';
 import { supabase } from '@/utils/supabase/client';
+import { ADMIN_DASHBOARD_PATH } from '@/utils/auth/flow';
 
 interface AdminLoginFormProps {
   message?: string;
@@ -27,11 +29,12 @@ export default function AdminLoginForm({ message }: AdminLoginFormProps) {
     });
 
     if (signInError) {
-      setError('Email hoặc mật khẩu không hợp lệ.');
+      setError('Email hoặc mật khẩu chưa đúng.');
       setChecking(false);
       return;
     }
 
+    router.replace(ADMIN_DASHBOARD_PATH);
     router.refresh();
     setChecking(false);
   };
@@ -43,7 +46,7 @@ export default function AdminLoginForm({ message }: AdminLoginFormProps) {
           <div className="w-12 h-12 bg-blue-500/10 text-blue-500 rounded-full flex items-center justify-center mx-auto border border-blue-500/20">
             <KeyRound className="w-6 h-6" />
           </div>
-          <h2 className="text-sm font-black uppercase tracking-wider">Đăng nhập quản trị</h2>
+          <h2 className="text-sm font-bold">Đăng nhập quản trị</h2>
         </div>
 
         <div className="space-y-2">
@@ -70,9 +73,13 @@ export default function AdminLoginForm({ message }: AdminLoginFormProps) {
           {error && <p className="text-[11px] text-red-400 text-center font-bold">{error}</p>}
         </div>
 
-        <button type="submit" disabled={checking} className="w-full bg-blue-600 hover:bg-blue-700 font-bold text-xs p-3 rounded-xl uppercase tracking-wider transition flex items-center justify-center gap-1">
-          {checking ? <RefreshCcw className="w-3.5 h-3.5 animate-spin" /> : 'Mở phiên quản trị'}
+        <button type="submit" disabled={checking} className="w-full bg-blue-600 hover:bg-blue-700 font-bold text-xs p-3 rounded-xl transition flex items-center justify-center gap-1">
+          {checking ? <RefreshCcw className="w-3.5 h-3.5 animate-spin" /> : 'Đăng nhập'}
         </button>
+
+        <Link href="/auth/forgot-password" className="block text-center text-xs text-slate-400 hover:text-slate-100">
+          Quên mật khẩu?
+        </Link>
       </form>
     </div>
   );

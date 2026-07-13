@@ -119,8 +119,8 @@ Không xóa lịch sử giai đoạn đã hoàn thành.
 | **13. Batch 3C3 Part 4: Owner Backfill** | ✅ | Owner backfill đã chạy trong Supabase SQL Editor. Part 5 validation xác nhận employee ID 3 được map đúng một Auth user, không đổi role/status/email. | `Part 4 đã hoàn thành. Part 5 mapping validation đã PASS.` | Đã chuyển sang Part 5. |
 | **14. Batch 3C3 Part 5: Mapping Validation** | ✅ | Read-only validation đã PASS: employee ID 3 có đúng một `auth_user_id`, Auth user tồn tại, normalized email khớp, không duplicate/orphan, role `ADMIN`, status `ACTIVE`, không có mapping ngoài employee ID 3. | `Part 5 mapping validation đã PASS. Không sửa dữ liệu, schema, RLS, role hoặc migration history.` | Chờ duyệt Part 6. |
 | **15. Batch 3C3 Part 6: Migration History** | ✅ | Đã đánh dấu riêng version `20260712181332` là applied bằng `migration repair`. Hai migration cũ vẫn chưa bị ghi nhận trên remote. Schema và Owner mapping không đổi sau repair. | `Part 6 đã PASS. Không chạy migration SQL, migration up, db push, db reset hoặc repair migration cũ.` | Batch 3C4 Invite và Password Flow. |
-| **16. Batch 3C4: Invite và Password Flow** | ⏳ | Tạo `/auth/callback`, `/auth/update-password`, quên mật khẩu, xử lý invite, loại token khỏi URL, UI tiếng Việt. | `Bắt đầu Batch 3C4. Hoàn thiện invite, đặt mật khẩu lần đầu, đăng nhập và quên mật khẩu. Không sửa schema hoặc RLS.` | Test đăng nhập Owner thật. |
-| **17. Batch 3D1: system_settings Refactor** | ⏳ | Chuyển access nhạy cảm khỏi browser. Phân loại key public, authenticated, admin-only, server-only. Xử lý SMTP dependency. | `Audit và refactor system_settings access. Chuyển write nhạy cảm về server. Chưa sửa policy live cho đến khi dependency tests PASS.` | Khóa broad policy. |
+| **16. Batch 3C4: Invite và Password Flow** | ⚠️ | Cần kiểm tra live `/auth/callback`, `/auth/update-password`, quên mật khẩu, đăng nhập email/mật khẩu và server admin gate theo `employees.auth_user_id`. Không sửa schema hoặc RLS. | `Batch 3C4 chưa hoàn thành. Chỉ chuyển Hoàn thành khi live verification PASS đầy đủ.` | Hoàn tất live verification trước Batch 3D1. |
+| **17. Batch 3D1: system_settings Refactor** | ⏳ | Chưa bắt đầu. Chỉ chuyển thành Đang làm sau khi Batch 3C4 hoàn tất. | `Không chuyển sang Batch 3D1 khi Batch 3C4 còn Cần kiểm tra hoặc bị chặn bởi thao tác thủ công.` | Khóa broad policy. |
 | **18. Batch 3D2: system_settings RLS** | ⏳ | Xóa policy `anon/authenticated ALL`. Dùng deny-by-default và policy theo phạm vi. | `Triển khai RLS cho system_settings theo policy matrix đã duyệt. Có rollback SQL và security tests. Rollout từng policy nhỏ.` | Kiểm tra config và SMTP. |
 | **19. Batch 3E1: Own-row RLS** | ⏳ | Bật RLS an toàn cho `employees`, `attendance`, `attendance_logs`. Staff chỉ xem dữ liệu của mình. | `Triển khai own-row RLS dựa trên auth.uid() → employees.auth_user_id. Không mở payroll/finance toàn hệ thống.` | Security matrix cho authenticated và wrong-user access. |
 | **20. Batch 3E2: Payroll và Finance Authorization** | ⏳ | Staff chỉ xem payslip của mình. Owner/Admin/Payroll xem theo permission. Project Manager không mặc định xem lương. | `Thiết kế và triển khai server authorization/RLS cho payroll và finance. Không thay đổi payroll calculation.` | Audit log và regression security tests. |
@@ -141,7 +141,7 @@ Không xóa lịch sử giai đoạn đã hoàn thành.
 
 ## Batch 3C4: Invite và Password Flow
 
-**Trạng thái:** ⏳ Chưa làm
+**Trạng thái:** ⚠️ Cần kiểm tra
 
 **Cập nhật:** 2026-07-13
 
@@ -173,6 +173,25 @@ Không xóa lịch sử giai đoạn đã hoàn thành.
 - Hai migration cũ `20260704153000` và `20260709110000`: remote vẫn trống sau repair.
 - Schema live sau repair: không đổi, vẫn tương đương migration `20260712181332`.
 - Owner mapping sau repair: không đổi.
+- Batch 3C4 invite/password flow: Cần kiểm thử live
+- Public route `/auth/callback`: PASS
+- Public route `/auth/update-password`: PASS
+- Public route `/auth/forgot-password`: PASS
+- Đăng nhập email/mật khẩu: Cần kiểm thử live
+- Quên mật khẩu dùng thông báo trung tính: PASS
+- Admin gate dùng `employees.auth_user_id`: PASS
+- Không để `code`, access token hoặc refresh token trên URL sau callback: PASS
+- Không cho redirect ra domain ngoài: PASS
+- Live verification sau cấu hình Supabase URL Configuration: Cần kiểm tra
+- Live read-only mapping ngày 2026-07-13: PASS
+- Employee ID 3 có đúng một linked Auth user: PASS
+- Linked Auth user không orphan: PASS
+- Employee ID 3 vẫn active ADMIN: PASS
+- Invite/recovery email redirect URL thực nhận trong inbox: CHƯA XÁC MINH
+- `/auth/callback` xử lý callback từ link thật thành công: CHƯA XÁC MINH
+- `/auth/update-password` đặt mật khẩu mới bằng session từ link thật: CHƯA XÁC MINH
+- Đăng nhập email/mật khẩu bằng password thật: CHƯA XÁC MINH
+- User không có quyền bị chặn khỏi khu vực quản trị bằng tài khoản thật: CHƯA XÁC MINH
 
 ### Kết luận Part 5
 
@@ -233,12 +252,26 @@ cho version `20260712181332`.
 - Chưa mở thêm policy RLS.
 - Không thay đổi role, status hoặc email nhân viên.
 - Không thay đổi Owner mapping sau Part 5.
+- Không log token, session, cookie hoặc mật khẩu trong auth routes mới.
+- Không lưu token thủ công vào `localStorage` hoặc `sessionStorage`.
+- Không thêm service role vào browser.
+- Không sửa schema, RLS, role hoặc `employees.auth_user_id`.
 
 ### Blocking còn lại
 
-Không còn blocking cho Batch 3C3. Batch 3C4 chưa bắt đầu và cần người dùng duyệt
-trước khi triển khai invite/password flow.
+Batch 3C4 chưa thể chuyển Hoàn thành vì live verification còn thiếu thao tác
+thủ công với email/link/password thật. Không tự tạo dữ liệu giả, không đổi
+schema/RLS và không tự chuyển sang Batch 3D1.
+
+Cần người vận hành thực hiện hoặc cung cấp kết quả các bước sau:
+
+- Tạo hoặc gửi lại invite/password recovery email cho tài khoản thật cần kiểm thử.
+- Mở email thật và xác nhận link redirect về `https://erp.luminalfactory.com/auth/callback`.
+- Dùng link đó để đi qua `/auth/callback` tới `/auth/update-password`.
+- Đặt mật khẩu mới, sau đó đăng nhập bằng email/mật khẩu thật.
+- Cung cấp tài khoản thật không có quyền admin, hoặc xác nhận có thể dùng tài khoản đó để kiểm thử admin gate.
 
 ### Bước tiếp theo
 
-Chờ duyệt Batch 3C4: Invite và Password Flow.
+Tiếp tục Batch 3C4 live verification sau khi có link/email/password thật. Batch
+3D1 vẫn chưa bắt đầu.
