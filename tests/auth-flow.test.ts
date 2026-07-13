@@ -11,6 +11,11 @@ import {
   validateNewPassword,
 } from '../utils/auth/flow';
 import { sendPasswordRecoveryEmail } from '../utils/auth/password-recovery';
+import {
+  cleanUpdatePasswordUrl,
+  INVALID_RECOVERY_LINK_MESSAGE,
+  resolveUpdatePasswordViewState,
+} from '../utils/auth/update-password-state';
 
 describe('auth flow helpers', () => {
   it('handles invite callback with token hash', () => {
@@ -82,11 +87,9 @@ describe('auth flow helpers', () => {
   });
 
   it('builds the ERP password recovery redirect URL from configured app base URL', () => {
-    expect(
-      buildPasswordRecoveryRedirectUrl({
-        NEXT_PUBLIC_APP_BASE_URL: 'https://erp.luminalfactory.com',
-      })
-    ).toBe('https://erp.luminalfactory.com/auth/update-password');
+    expect(buildPasswordRecoveryRedirectUrl(' https://erp.luminalfactory.com/ ')).toBe(
+      'https://erp.luminalfactory.com/auth/update-password'
+    );
   });
 
   it('passes the ERP update-password URL to resetPasswordForEmail', async () => {
@@ -95,9 +98,7 @@ describe('auth flow helpers', () => {
     await sendPasswordRecoveryEmail(
       { resetPasswordForEmail },
       '  nhanvien@luminalfactory.com  ',
-      {
-        NEXT_PUBLIC_APP_BASE_URL: 'https://erp.luminalfactory.com',
-      }
+      'https://erp.luminalfactory.com'
     );
 
     expect(resetPasswordForEmail).toHaveBeenCalledWith('nhanvien@luminalfactory.com', {
@@ -145,5 +146,41 @@ describe('auth flow helpers', () => {
         NEXT_PUBLIC_APP_BASE_URL: 'ftp://erp.luminalfactory.com',
       })
     ).toThrow('NEXT_PUBLIC_APP_BASE_URL không hợp lệ cho luồng đặt lại mật khẩu.');
+  });
+
+  it('hides the update-password form when the URL has otp_expired', () => {
+    const viewState = resolveUpdatePasswordViewState(
+      { error: 'access_denied', errorCode: 'otp_expired' },
+      'valid'
+    );
+
+    expect(viewState.showForm).toBe(false);
+    expect(viewState.status).toBe('invalid');
+    expect(viewState.message).toBe(INVALID_RECOVERY_LINK_MESSAGE);
+  });
+
+  it('hides the update-password form when the recovery session is invalid', () => {
+    const viewState = resolveUpdatePasswordViewState({}, 'invalid');
+
+    expect(viewState.showForm).toBe(false);
+    expect(viewState.status).toBe('invalid');
+    expect(viewState.message).toBe(INVALID_RECOVERY_LINK_MESSAGE);
+  });
+
+  it('shows the update-password form when the recovery session is valid', () => {
+    const viewState = resolveUpdatePasswordViewState({}, 'valid');
+
+    expect(viewState.showForm).toBe(true);
+    expect(viewState.status).toBe('valid');
+  });
+
+  it('points the resend instructions action to forgot password', () => {
+    const viewState = resolveUpdatePasswordViewState({ errorCode: 'otp_expired' }, 'invalid');
+
+    expect(viewState.resendHref).toBe('/auth/forgot-password');
+  });
+
+  it('cleans auth error parameters from the update-password URL', () => {
+    expect(cleanUpdatePasswordUrl()).toBe('/auth/update-password');
   });
 });

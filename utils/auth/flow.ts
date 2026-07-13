@@ -1,5 +1,3 @@
-const SAFE_REDIRECT_BASE_URL = 'https://erp.luminalfactory.com';
-
 export const AUTH_CALLBACK_PATH = '/auth/callback';
 export const UPDATE_PASSWORD_PATH = '/auth/update-password';
 export const ADMIN_DASHBOARD_PATH = '/admin/dashboard';
@@ -42,11 +40,13 @@ function trimTrailingSlash(value: string): string {
 
 function normalizeBaseUrl(value: string | undefined): string | null {
   if (!value) return null;
-  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(value) && !/^https?:\/\//i.test(value)) {
+  const trimmedValue = value.trim();
+  if (!trimmedValue) return null;
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(trimmedValue) && !/^https?:\/\//i.test(trimmedValue)) {
     return null;
   }
 
-  const candidate = /^https?:\/\//i.test(value) ? value : `https://${value}`;
+  const candidate = /^https?:\/\//i.test(trimmedValue) ? trimmedValue : `https://${trimmedValue}`;
 
   try {
     const url = new URL(candidate);
@@ -58,14 +58,29 @@ function normalizeBaseUrl(value: string | undefined): string | null {
   }
 }
 
-export function getAppBaseUrlConfigError(
-  env: Record<string, string | undefined> = process.env
-): string | null {
-  if (!env.NEXT_PUBLIC_APP_BASE_URL) {
+export function buildAppBaseUrl(value: string | undefined): string {
+  if (!value?.trim()) {
+    throw new Error('Thiếu cấu hình NEXT_PUBLIC_APP_BASE_URL cho luồng đặt lại mật khẩu.');
+  }
+
+  const normalizedBaseUrl = normalizeBaseUrl(value);
+  if (!normalizedBaseUrl) {
+    throw new Error('NEXT_PUBLIC_APP_BASE_URL không hợp lệ cho luồng đặt lại mật khẩu.');
+  }
+
+  return normalizedBaseUrl;
+}
+
+export function getPublicAppBaseUrl(): string {
+  return buildAppBaseUrl(process.env.NEXT_PUBLIC_APP_BASE_URL);
+}
+
+export function getAppBaseUrlConfigError(value: string | undefined): string | null {
+  if (!value?.trim()) {
     return 'Thiếu cấu hình NEXT_PUBLIC_APP_BASE_URL cho luồng đặt lại mật khẩu.';
   }
 
-  if (!normalizeBaseUrl(env.NEXT_PUBLIC_APP_BASE_URL)) {
+  if (!normalizeBaseUrl(value)) {
     return 'NEXT_PUBLIC_APP_BASE_URL không hợp lệ cho luồng đặt lại mật khẩu.';
   }
 
@@ -75,10 +90,7 @@ export function getAppBaseUrlConfigError(
 export function getConfiguredAppBaseUrl(
   env: Record<string, string | undefined> = process.env
 ): string {
-  const configError = getAppBaseUrlConfigError(env);
-  if (configError) throw new Error(configError);
-
-  return normalizeBaseUrl(env.NEXT_PUBLIC_APP_BASE_URL)!;
+  return buildAppBaseUrl(env.NEXT_PUBLIC_APP_BASE_URL);
 }
 
 export function getRequestBaseUrl(
@@ -97,14 +109,8 @@ export function isSafeInternalRedirectPath(value: string | null | undefined): bo
   if (!value.startsWith('/')) return false;
   if (value.startsWith('//')) return false;
 
-  try {
-    const parsed = new URL(value, SAFE_REDIRECT_BASE_URL);
-    if (parsed.origin !== SAFE_REDIRECT_BASE_URL) return false;
-
-    return allowedRedirectPaths.has(parsed.pathname);
-  } catch {
-    return false;
-  }
+  const [pathname] = value.split(/[?#]/);
+  return allowedRedirectPaths.has(pathname);
 }
 
 export function resolveSafeRedirectPath(
@@ -158,10 +164,8 @@ export function buildAuthRedirectUrl(baseUrl: string, path = AUTH_CALLBACK_PATH)
   return new URL(safePath, trimTrailingSlash(baseUrl)).toString();
 }
 
-export function buildPasswordRecoveryRedirectUrl(
-  env: Record<string, string | undefined> = process.env
-): string {
-  return buildAuthRedirectUrl(getConfiguredAppBaseUrl(env), UPDATE_PASSWORD_PATH);
+export function buildPasswordRecoveryRedirectUrl(appBaseUrl = getPublicAppBaseUrl()): string {
+  return buildAuthRedirectUrl(buildAppBaseUrl(appBaseUrl), UPDATE_PASSWORD_PATH);
 }
 
 export function validateNewPassword(

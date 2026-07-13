@@ -1,4 +1,4 @@
-import { buildPasswordRecoveryRedirectUrl } from './flow';
+import { buildPasswordRecoveryRedirectUrl, getAppBaseUrlConfigError } from './flow';
 
 interface PasswordRecoveryAuthClient {
   resetPasswordForEmail(
@@ -10,22 +10,19 @@ interface PasswordRecoveryAuthClient {
 }
 
 export function getPasswordRecoveryConfigurationError(
-  env: Record<string, string | undefined> = process.env
+  appBaseUrl = process.env.NEXT_PUBLIC_APP_BASE_URL
 ): string | null {
-  try {
-    buildPasswordRecoveryRedirectUrl(env);
-    return null;
-  } catch {
-    return 'Cấu hình đặt lại mật khẩu chưa hợp lệ. Vui lòng liên hệ quản trị viên.';
-  }
+  return getAppBaseUrlConfigError(appBaseUrl)
+    ? 'Cấu hình đặt lại mật khẩu chưa hợp lệ. Vui lòng liên hệ quản trị viên.'
+    : null;
 }
 
 export async function sendPasswordRecoveryEmail(
   auth: PasswordRecoveryAuthClient,
   email: string,
-  env: Record<string, string | undefined> = process.env
+  appBaseUrl = process.env.NEXT_PUBLIC_APP_BASE_URL
 ): Promise<unknown> {
   return auth.resetPasswordForEmail(email.trim(), {
-    redirectTo: buildPasswordRecoveryRedirectUrl(env),
+    redirectTo: buildPasswordRecoveryRedirectUrl(appBaseUrl),
   });
 }
