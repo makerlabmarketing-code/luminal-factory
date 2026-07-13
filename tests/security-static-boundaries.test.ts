@@ -109,7 +109,7 @@ describe('static security boundaries', () => {
     const adminAuthRoute = readFileSync(join(repositoryRoot, 'app/api/admin/auth/route.ts'), 'utf8');
     const serverAuth = readFileSync(join(repositoryRoot, 'services/server/auth.ts'), 'utf8');
 
-    expect(adminLayout).toMatch(/getServerAuthContext/);
+    expect(adminLayout).toMatch(/getServerAdminAuthContext/);
     expect(adminLayout).toMatch(/hasAdminAccess/);
     expect(adminAuthRoute).toMatch(/requireAdminEmployee/);
     expect(adminAuthRoute).not.toMatch(/passcode/);

@@ -87,13 +87,21 @@ type AuthContextLookupResult =
     };
 
 export const STAFF_EMPLOYEE_SELECT =
-  'id, auth_user_id, employee_id, full_name, email, title, status, role, is_manager, is_active, branch, branch_code, phone, bank_name, bank_account_number, hourly_rate, base_salary_per_hour';
+  'id, auth_user_id, full_name, email, title, status, role, is_manager, is_active, branch, branch_code, phone, bank_name, bank_account_number, hourly_rate, base_salary_per_hour';
 
 export const ADMIN_EMPLOYEE_AUTH_SELECT =
   'id, auth_user_id, role, status, is_active';
 
 function normalizeRole(role?: string | null): string {
   return (role || '').trim().toUpperCase();
+}
+
+function redactSafeDatabaseText(value?: string | null): string | null {
+  if (!value) return null;
+
+  return value
+    .replace(/[a-f0-9]{8}-[a-f0-9]{4}-[1-5][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}/gi, '[uuid]')
+    .replace(/eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g, '[jwt]');
 }
 
 export function isActiveEmployee(employee: ServerEmployee): boolean {
@@ -126,7 +134,9 @@ export function toPublicStaffEmployee(employee: ServerEmployee) {
   };
 }
 
-async function getServerAuthContextLookup(): Promise<AuthContextLookupResult> {
+async function getServerAuthContextLookup(
+  employeeSelect = STAFF_EMPLOYEE_SELECT
+): Promise<AuthContextLookupResult> {
   const supabase = await createClient();
   const { data: userResult, error: userError } = await supabase.auth.getUser();
   const user = userResult.user;
@@ -156,7 +166,7 @@ async function getServerAuthContextLookup(): Promise<AuthContextLookupResult> {
 
   const { data: employee, error: employeeError } = await supabase
     .from('employees')
-    .select(STAFF_EMPLOYEE_SELECT)
+    .select(employeeSelect)
     .eq('auth_user_id', user.id)
     .maybeSingle();
 
@@ -169,6 +179,9 @@ async function getServerAuthContextLookup(): Promise<AuthContextLookupResult> {
         get_user_success: true,
         employee_lookup_result_count: 0,
         supabase_error_code: employeeError.code ?? 'unknown',
+        supabase_error_message: redactSafeDatabaseText(employeeError.message),
+        supabase_error_hint: redactSafeDatabaseText(employeeError.hint),
+        supabase_error_details: redactSafeDatabaseText(employeeError.details),
       },
     };
   }
@@ -184,7 +197,7 @@ async function getServerAuthContextLookup(): Promise<AuthContextLookupResult> {
     };
   }
 
-  const serverEmployee = employee as ServerEmployee;
+  const serverEmployee = employee as unknown as ServerEmployee;
   if (!isActiveEmployee(serverEmployee)) {
     return {
       ok: false,
@@ -209,6 +222,12 @@ async function getServerAuthContextLookup(): Promise<AuthContextLookupResult> {
 
 export async function getServerAuthContext(): Promise<AuthContext | null> {
   const result = await getServerAuthContextLookup();
+
+  return result.ok ? result.authContext : null;
+}
+
+export async function getServerAdminAuthContext(): Promise<AuthContext | null> {
+  const result = await getServerAuthContextLookup(ADMIN_EMPLOYEE_AUTH_SELECT);
 
   return result.ok ? result.authContext : null;
 }
@@ -260,7 +279,49 @@ export async function requireAuthenticatedEmployee(): Promise<AuthContext> {
 }
 
 export async function requireAdminEmployee(): Promise<AuthContext> {
-  const authContext = await requireAuthenticatedEmployee();
+  const result = await getServerAuthContextLookup(ADMIN_EMPLOYEE_AUTH_SELECT);
+
+  if (!result.ok) {
+    if (result.reason === 'employee_not_linked') {
+      throw new AuthFlowError({
+        status: 404,
+        code: 'employee_not_linked',
+        message: 'Tài khoản chưa được liên kết với nhân viên.',
+        failureStage: result.failureStage,
+        safeDetails: result.safeDetails,
+      });
+    }
+
+    if (result.reason === 'employee_inactive') {
+      throw new AuthFlowError({
+        status: 403,
+        code: 'employee_inactive',
+        message: 'Bạn không có quyền truy cập khu vực quản trị.',
+        failureStage: result.failureStage,
+        safeDetails: result.safeDetails,
+      });
+    }
+
+    if (result.reason === 'database_error') {
+      throw new AuthFlowError({
+        status: 500,
+        code: 'admin_verification_failed',
+        message: 'Không thể xác minh quyền quản trị. Vui lòng thử lại.',
+        failureStage: result.failureStage,
+        safeDetails: result.safeDetails,
+      });
+    }
+
+    throw new AuthFlowError({
+      status: 401,
+      code: 'session_not_verified',
+      message: 'Phiên đăng nhập chưa được xác nhận. Vui lòng đăng nhập lại.',
+      failureStage: result.failureStage,
+      safeDetails: result.safeDetails,
+    });
+  }
+
+  const authContext = result.authContext;
 
   if (!hasAdminAccess(authContext.employee)) {
     throw new AuthFlowError({

@@ -407,9 +407,13 @@ describe('admin login flow', () => {
     expect(routeSource).toMatch(/employee_lookup_started/);
     expect(routeSource).toMatch(/employee_lookup_result_count/);
     expect(routeSource).toMatch(/failure_stage/);
+    expect(routeSource).toMatch(/supabase_error_code/);
+    expect(routeSource).toMatch(/supabase_error_message/);
     expect(serverAuthSource).toMatch(/supabase\.auth\.getUser\(\)/);
     expect(serverAuthSource).toMatch(/\.eq\('auth_user_id', user\.id\)/);
-    expect(serverAuthSource).toMatch(/id, auth_user_id, employee_id, full_name, email, title, status, role/);
+    expect(serverAuthSource).toMatch(/ADMIN_EMPLOYEE_AUTH_SELECT =\n  'id, auth_user_id, role, status, is_active'/);
+    expect(serverAuthSource).toMatch(/getServerAuthContextLookup\(ADMIN_EMPLOYEE_AUTH_SELECT\)/);
+    expect(serverAuthSource).not.toMatch(/ADMIN_EMPLOYEE_AUTH_SELECT =\n  '.*employee_id/);
     expect(serverAuthSource).toMatch(/role === 'ADMIN'/);
     expect(serverAuthSource).toMatch(/role === 'OWNER'/);
     expect(serverAuthSource).toMatch(/isActiveEmployee\(serverEmployee\)/);
@@ -421,6 +425,7 @@ describe('admin login flow', () => {
     expect(serverAuthSource).toMatch(/employee_inactive/);
     expect(routeSource).toMatch(/admin_forbidden/);
     expect(routeSource).toMatch(/admin_verification_failed/);
+    expect(layoutSource).toMatch(/getServerAdminAuthContext/);
     expect(layoutSource).toMatch(/dynamic = 'force-dynamic'/);
     expect(layoutSource).toMatch(/revalidate = 0/);
     expect(layoutSource).toMatch(/fetchCache = 'force-no-store'/);

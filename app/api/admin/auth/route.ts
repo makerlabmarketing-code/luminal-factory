@@ -48,6 +48,9 @@ function toErrorResponse(error: unknown, hasAuthCookie: boolean) {
       failure_stage: error.failureStage,
       code: error.code,
       supabase_error_code: error.safeDetails?.supabase_error_code ?? null,
+      supabase_error_message: error.safeDetails?.supabase_error_message ?? null,
+      supabase_error_hint: error.safeDetails?.supabase_error_hint ?? null,
+      supabase_error_details: error.safeDetails?.supabase_error_details ?? null,
     };
 
     logAdminAuthDiagnostic(diagnostic);
