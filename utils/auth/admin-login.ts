@@ -2,10 +2,10 @@ import { ADMIN_DASHBOARD_PATH } from './flow';
 
 export const ADMIN_LOGIN_MESSAGES = {
   invalidCredentials: 'Email hoặc mật khẩu chưa đúng.',
-  unconfirmedSession: 'Phiên đăng nhập chưa được xác nhận. Vui lòng thử lại.',
-  missingEmployee: 'Tài khoản chưa được cấp quyền sử dụng hệ thống.',
+  unconfirmedSession: 'Phiên đăng nhập chưa được xác nhận. Vui lòng đăng nhập lại.',
+  missingEmployee: 'Tài khoản chưa được liên kết với nhân viên.',
   forbidden: 'Bạn không có quyền truy cập khu vực quản trị.',
-  serverError: 'Không thể xác minh quyền quản trị.',
+  serverError: 'Không thể xác minh quyền quản trị. Vui lòng thử lại.',
 } as const;
 
 export const ADMIN_LOGIN_STEP_MESSAGES = {
@@ -66,7 +66,7 @@ function toAdminVerificationMessage(
   errorCode?: string
 ): string {
   if (status === 401) return ADMIN_LOGIN_MESSAGES.unconfirmedSession;
-  if (status === 404 || errorCode === 'missing_employee') {
+  if (status === 404 || errorCode === 'employee_not_linked') {
     return ADMIN_LOGIN_MESSAGES.missingEmployee;
   }
   if (errorMessage === ADMIN_LOGIN_MESSAGES.missingEmployee) {

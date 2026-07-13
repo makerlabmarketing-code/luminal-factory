@@ -4,13 +4,45 @@ import { createClient } from '@/utils/supabase/server';
 
 export class AuthFlowError extends Error {
   status: number;
+  code: AuthFlowErrorCode;
+  failureStage: AuthFailureStage;
+  safeDetails?: Record<string, boolean | number | string | null>;
 
-  constructor(status: number, message: string) {
+  constructor({
+    status,
+    code,
+    message,
+    failureStage,
+    safeDetails,
+  }: {
+    status: number;
+    code: AuthFlowErrorCode;
+    message: string;
+    failureStage: AuthFailureStage;
+    safeDetails?: Record<string, boolean | number | string | null>;
+  }) {
     super(message);
     this.name = 'AuthFlowError';
     this.status = status;
+    this.code = code;
+    this.failureStage = failureStage;
+    this.safeDetails = safeDetails;
   }
 }
+
+export type AuthFlowErrorCode =
+  | 'session_not_verified'
+  | 'employee_not_linked'
+  | 'employee_inactive'
+  | 'admin_forbidden'
+  | 'admin_verification_failed';
+
+export type AuthFailureStage =
+  | 'auth_get_user'
+  | 'employee_lookup'
+  | 'employee_status'
+  | 'admin_role'
+  | 'unknown';
 
 export interface ServerEmployee {
   id: number | string;
@@ -46,15 +78,19 @@ type AuthContextLookupResult =
   | {
       ok: false;
       reason:
-        | 'missing_session'
-        | 'missing_email'
-        | 'missing_employee'
-        | 'inactive_employee'
-        | 'server_error';
+        | 'session_not_verified'
+        | 'employee_not_linked'
+        | 'employee_inactive'
+        | 'database_error';
+      failureStage: AuthFailureStage;
+      safeDetails?: Record<string, boolean | number | string | null>;
     };
 
 export const STAFF_EMPLOYEE_SELECT =
   'id, auth_user_id, employee_id, full_name, email, title, status, role, is_manager, is_active, branch, branch_code, phone, bank_name, bank_account_number, hourly_rate, base_salary_per_hour';
+
+export const ADMIN_EMPLOYEE_AUTH_SELECT =
+  'id, auth_user_id, role, status, is_active';
 
 function normalizeRole(role?: string | null): string {
   return (role || '').trim().toUpperCase();
@@ -95,10 +131,28 @@ async function getServerAuthContextLookup(): Promise<AuthContextLookupResult> {
   const { data: userResult, error: userError } = await supabase.auth.getUser();
   const user = userResult.user;
 
-  if (userError || !user) return { ok: false, reason: 'missing_session' };
+  if (userError || !user) {
+    return {
+      ok: false,
+      reason: 'session_not_verified',
+      failureStage: 'auth_get_user',
+      safeDetails: {
+        get_user_success: false,
+      },
+    };
+  }
 
   const email = user.email || null;
-  if (!email) return { ok: false, reason: 'missing_email' };
+  if (!email) {
+    return {
+      ok: false,
+      reason: 'session_not_verified',
+      failureStage: 'auth_get_user',
+      safeDetails: {
+        get_user_success: false,
+      },
+    };
+  }
 
   const { data: employee, error: employeeError } = await supabase
     .from('employees')
@@ -106,11 +160,42 @@ async function getServerAuthContextLookup(): Promise<AuthContextLookupResult> {
     .eq('auth_user_id', user.id)
     .maybeSingle();
 
-  if (employeeError) return { ok: false, reason: 'server_error' };
-  if (!employee) return { ok: false, reason: 'missing_employee' };
+  if (employeeError) {
+    return {
+      ok: false,
+      reason: 'database_error',
+      failureStage: 'employee_lookup',
+      safeDetails: {
+        get_user_success: true,
+        employee_lookup_result_count: 0,
+        supabase_error_code: employeeError.code ?? 'unknown',
+      },
+    };
+  }
+  if (!employee) {
+    return {
+      ok: false,
+      reason: 'employee_not_linked',
+      failureStage: 'employee_lookup',
+      safeDetails: {
+        get_user_success: true,
+        employee_lookup_result_count: 0,
+      },
+    };
+  }
 
   const serverEmployee = employee as ServerEmployee;
-  if (!isActiveEmployee(serverEmployee)) return { ok: false, reason: 'inactive_employee' };
+  if (!isActiveEmployee(serverEmployee)) {
+    return {
+      ok: false,
+      reason: 'employee_inactive',
+      failureStage: 'employee_status',
+      safeDetails: {
+        get_user_success: true,
+        employee_lookup_result_count: 1,
+      },
+    };
+  }
 
   return {
     ok: true,
@@ -132,19 +217,43 @@ export async function requireAuthenticatedEmployee(): Promise<AuthContext> {
   const result = await getServerAuthContextLookup();
 
   if (!result.ok) {
-    if (result.reason === 'missing_employee') {
-      throw new AuthFlowError(404, 'Tài khoản chưa được cấp quyền sử dụng hệ thống.');
+    if (result.reason === 'employee_not_linked') {
+      throw new AuthFlowError({
+        status: 404,
+        code: 'employee_not_linked',
+        message: 'Tài khoản chưa được liên kết với nhân viên.',
+        failureStage: result.failureStage,
+        safeDetails: result.safeDetails,
+      });
     }
 
-    if (result.reason === 'inactive_employee') {
-      throw new AuthFlowError(403, 'Tài khoản nhân sự chưa được phép truy cập.');
+    if (result.reason === 'employee_inactive') {
+      throw new AuthFlowError({
+        status: 403,
+        code: 'employee_inactive',
+        message: 'Bạn không có quyền truy cập khu vực quản trị.',
+        failureStage: result.failureStage,
+        safeDetails: result.safeDetails,
+      });
     }
 
-    if (result.reason === 'server_error') {
-      throw new AuthFlowError(500, 'Không thể xác minh phiên đăng nhập.');
+    if (result.reason === 'database_error') {
+      throw new AuthFlowError({
+        status: 500,
+        code: 'admin_verification_failed',
+        message: 'Không thể xác minh quyền quản trị. Vui lòng thử lại.',
+        failureStage: result.failureStage,
+        safeDetails: result.safeDetails,
+      });
     }
 
-    throw new AuthFlowError(401, 'Vui lòng đăng nhập để tiếp tục.');
+    throw new AuthFlowError({
+      status: 401,
+      code: 'session_not_verified',
+      message: 'Phiên đăng nhập chưa được xác nhận. Vui lòng đăng nhập lại.',
+      failureStage: result.failureStage,
+      safeDetails: result.safeDetails,
+    });
   }
 
   return result.authContext;
@@ -154,7 +263,16 @@ export async function requireAdminEmployee(): Promise<AuthContext> {
   const authContext = await requireAuthenticatedEmployee();
 
   if (!hasAdminAccess(authContext.employee)) {
-    throw new AuthFlowError(403, 'Bạn không có quyền truy cập khu vực quản trị.');
+    throw new AuthFlowError({
+      status: 403,
+      code: 'admin_forbidden',
+      message: 'Bạn không có quyền truy cập khu vực quản trị.',
+      failureStage: 'admin_role',
+      safeDetails: {
+        get_user_success: true,
+        employee_lookup_result_count: 1,
+      },
+    });
   }
 
   return authContext;

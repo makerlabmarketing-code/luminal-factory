@@ -165,7 +165,7 @@ describe('admin login flow', () => {
             false,
             404,
             ADMIN_LOGIN_MESSAGES.missingEmployee,
-            'missing_employee'
+            'employee_not_linked'
           )
         ),
     });
@@ -189,6 +189,29 @@ describe('admin login flow', () => {
       verifyAdminSession: vi
         .fn()
         .mockResolvedValue(verificationResponse(false, 403, ADMIN_LOGIN_MESSAGES.forbidden)),
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      message: ADMIN_LOGIN_MESSAGES.forbidden,
+    });
+  });
+
+  it('reports inactive employees as forbidden admin access', async () => {
+    const result = await submitAdminLogin({
+      auth: {
+        signInWithPassword: vi.fn().mockResolvedValue({
+          data: { session: { id: 'session' }, user: { id: 'auth-user-id' } },
+          error: null,
+        }),
+      },
+      email: 'inactive@luminalfactory.com',
+      password: 'mat-khau',
+      verifyAdminSession: vi
+        .fn()
+        .mockResolvedValue(
+          verificationResponse(false, 403, ADMIN_LOGIN_MESSAGES.forbidden, 'employee_inactive')
+        ),
     });
 
     expect(result).toEqual({
@@ -284,6 +307,29 @@ describe('admin login flow', () => {
     });
   });
 
+  it('reports auth.getUser errors as an unconfirmed session instead of a server failure', async () => {
+    const result = await submitAdminLogin({
+      auth: {
+        signInWithPassword: vi.fn().mockResolvedValue({
+          data: { session: { id: 'session' }, user: { id: 'auth-user-id' } },
+          error: null,
+        }),
+      },
+      email: 'admin@luminalfactory.com',
+      password: 'mat-khau',
+      verifyAdminSession: vi
+        .fn()
+        .mockResolvedValue(
+          verificationResponse(false, 401, ADMIN_LOGIN_MESSAGES.unconfirmedSession, 'session_not_verified')
+        ),
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      message: ADMIN_LOGIN_MESSAGES.unconfirmedSession,
+    });
+  });
+
   it('reports a server error for admin verification 500 responses', async () => {
     const result = await submitAdminLogin({
       auth: {
@@ -356,13 +402,25 @@ describe('admin login flow', () => {
     expect(routeSource).toMatch(/export async function POST/);
     expect(routeSource).toMatch(/requireAdminEmployee\(\)/);
     expect(routeSource).not.toMatch(/request\.json\(/);
+    expect(routeSource).toMatch(/has_auth_cookie/);
+    expect(routeSource).toMatch(/get_user_success/);
+    expect(routeSource).toMatch(/employee_lookup_started/);
+    expect(routeSource).toMatch(/employee_lookup_result_count/);
+    expect(routeSource).toMatch(/failure_stage/);
     expect(serverAuthSource).toMatch(/supabase\.auth\.getUser\(\)/);
     expect(serverAuthSource).toMatch(/\.eq\('auth_user_id', user\.id\)/);
+    expect(serverAuthSource).toMatch(/id, auth_user_id, employee_id, full_name, email, title, status, role/);
     expect(serverAuthSource).toMatch(/role === 'ADMIN'/);
+    expect(serverAuthSource).toMatch(/role === 'OWNER'/);
     expect(serverAuthSource).toMatch(/isActiveEmployee\(serverEmployee\)/);
     expect(serverAuthSource).toMatch(/hasAdminAccess\(authContext\.employee\)/);
     expect(routeSource).toMatch(/status: 200/);
     expect(routeSource).toMatch(/code: 'admin_verified'/);
+    expect(routeSource).toMatch(/session_not_verified/);
+    expect(routeSource).toMatch(/employee_not_linked/);
+    expect(serverAuthSource).toMatch(/employee_inactive/);
+    expect(routeSource).toMatch(/admin_forbidden/);
+    expect(routeSource).toMatch(/admin_verification_failed/);
     expect(layoutSource).toMatch(/dynamic = 'force-dynamic'/);
     expect(layoutSource).toMatch(/revalidate = 0/);
     expect(layoutSource).toMatch(/fetchCache = 'force-no-store'/);

@@ -200,6 +200,7 @@ Không xóa lịch sử giai đoạn đã hoàn thành.
 - Supabase signIn request: PASS
 - Admin session/navigation: BỊ CHẶN
 - Live verification 2026-07-13: production bundle đang phục vụ không chứa `POST /api/admin/auth` hoặc full document navigation; cần deploy lại bundle mới rồi test lại.
+- Live verification tiếp theo: `POST /api/admin/auth` đã chạy nhưng trả `500 admin_verification_failed`; theo code cũ failure nằm ở employee lookup `employees.auth_user_id` trả database/query error. Cần deploy bản phân loại lỗi/diagnostic an toàn để xác định Supabase/PostgREST error code.
 - User không có quyền bị chặn khỏi khu vực quản trị bằng tài khoản thật: CHƯA XÁC MINH
 
 ### Kết luận Part 5
