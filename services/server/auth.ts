@@ -35,6 +35,8 @@ export type AuthFlowErrorCode =
   | 'employee_not_linked'
   | 'employee_inactive'
   | 'admin_forbidden'
+  | 'workspace_forbidden'
+  | 'permission_forbidden'
   | 'admin_verification_failed';
 
 export type AuthFailureStage =
@@ -42,6 +44,8 @@ export type AuthFailureStage =
   | 'employee_lookup'
   | 'employee_status'
   | 'admin_role'
+  | 'workspace_access'
+  | 'permission_check'
   | 'unknown';
 
 export interface ServerEmployee {
@@ -68,6 +72,15 @@ export interface AuthContext {
   authUserId: string;
   email: string | null;
   employee: ServerEmployee;
+}
+
+export type WorkspaceCode = 'ADMIN_WORKSPACE' | 'STAFF_WORKSPACE';
+
+export interface WorkspaceAccessDecision {
+  allowed: boolean;
+  viaWorkspace: boolean;
+  viaLegacyFallback: boolean;
+  workspace: WorkspaceCode;
 }
 
 type AuthContextLookupResult =
@@ -114,6 +127,214 @@ export function hasAdminAccess(employee: ServerEmployee): boolean {
   const role = normalizeRole(employee.role);
 
   return isActiveEmployee(employee) && (role === 'ADMIN' || role === 'OWNER');
+}
+
+function logAuthorizationDiagnostic(diagnostic: Record<string, boolean | number | string | null>) {
+  console.warn('[authorization]', diagnostic);
+}
+
+function employeeIdValue(employee: ServerEmployee): string | number {
+  return employee.id;
+}
+
+function isActivePermissionRow(row: {
+  effect?: string | null;
+  status?: string | null;
+  revoked_at?: string | null;
+}): boolean {
+  return row.status === 'ACTIVE' && !row.revoked_at;
+}
+
+async function lookupWorkspaceAccess(
+  authContext: AuthContext,
+  workspaceCode: WorkspaceCode
+): Promise<{ ok: true; hasAccess: boolean } | { ok: false; safeDetails: Record<string, string | null> }> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('employee_workspace_access')
+    .select('id')
+    .eq('employee_id', employeeIdValue(authContext.employee))
+    .eq('workspace', workspaceCode)
+    .eq('status', 'ACTIVE')
+    .is('revoked_at', null)
+    .limit(1);
+
+  if (error) {
+    return {
+      ok: false,
+      safeDetails: {
+        supabase_error_code: error.code ?? 'unknown',
+        supabase_error_message: redactSafeDatabaseText(error.message),
+        supabase_error_hint: redactSafeDatabaseText(error.hint),
+        supabase_error_details: redactSafeDatabaseText(error.details),
+      },
+    };
+  }
+
+  return { ok: true, hasAccess: Boolean(data?.length) };
+}
+
+async function lookupPermissionAccess(
+  authContext: AuthContext,
+  permissionCode: string
+): Promise<{ ok: true; hasAccess: boolean } | { ok: false; safeDetails: Record<string, string | null> }> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('employee_permissions')
+    .select('effect, status, revoked_at')
+    .eq('employee_id', employeeIdValue(authContext.employee))
+    .eq('permission_code', permissionCode)
+    .eq('status', 'ACTIVE')
+    .is('revoked_at', null);
+
+  if (error) {
+    return {
+      ok: false,
+      safeDetails: {
+        supabase_error_code: error.code ?? 'unknown',
+        supabase_error_message: redactSafeDatabaseText(error.message),
+        supabase_error_hint: redactSafeDatabaseText(error.hint),
+        supabase_error_details: redactSafeDatabaseText(error.details),
+      },
+    };
+  }
+
+  const rows = (data || []) as Array<{
+    effect?: string | null;
+    status?: string | null;
+    revoked_at?: string | null;
+  }>;
+  const activeRows = rows.filter(isActivePermissionRow);
+  const hasDeny = activeRows.some((row) => row.effect === 'DENY');
+  const hasAllow = activeRows.some((row) => row.effect === 'ALLOW');
+
+  return { ok: true, hasAccess: !hasDeny && hasAllow };
+}
+
+export async function hasWorkspaceAccess(
+  authContext: AuthContext,
+  workspaceCode: WorkspaceCode
+): Promise<boolean> {
+  const result = await lookupWorkspaceAccess(authContext, workspaceCode);
+
+  return result.ok && result.hasAccess;
+}
+
+export async function hasPermission(
+  authContext: AuthContext,
+  permissionCode: string
+): Promise<boolean> {
+  const result = await lookupPermissionAccess(authContext, permissionCode);
+
+  return result.ok && result.hasAccess;
+}
+
+export async function canAccessAdmin(
+  authContext: AuthContext
+): Promise<WorkspaceAccessDecision> {
+  const workspaceResult = await lookupWorkspaceAccess(authContext, 'ADMIN_WORKSPACE');
+  const viaWorkspace = workspaceResult.ok && workspaceResult.hasAccess;
+  const viaLegacyFallback = !viaWorkspace && hasAdminAccess(authContext.employee);
+
+  return {
+    allowed: viaWorkspace || viaLegacyFallback,
+    viaWorkspace,
+    viaLegacyFallback,
+    workspace: 'ADMIN_WORKSPACE',
+  };
+}
+
+export async function canAccessStaff(
+  authContext: AuthContext
+): Promise<WorkspaceAccessDecision> {
+  const workspaceResult = await lookupWorkspaceAccess(authContext, 'STAFF_WORKSPACE');
+  const viaWorkspace = workspaceResult.ok && workspaceResult.hasAccess;
+
+  return {
+    allowed: viaWorkspace,
+    viaWorkspace,
+    viaLegacyFallback: false,
+    workspace: 'STAFF_WORKSPACE',
+  };
+}
+
+export async function requireCurrentEmployee(): Promise<AuthContext> {
+  return requireAuthenticatedEmployee();
+}
+
+export async function requireWorkspaceAccess(
+  workspaceCode: WorkspaceCode,
+  options: { allowLegacyAdminFallback?: boolean } = {}
+): Promise<AuthContext> {
+  const authContext = await requireAuthenticatedEmployee();
+  const workspaceResult = await lookupWorkspaceAccess(authContext, workspaceCode);
+
+  if (!workspaceResult.ok) {
+    throw new AuthFlowError({
+      status: 500,
+      code: 'admin_verification_failed',
+      message: 'Không thể xác minh quyền truy cập. Vui lòng thử lại.',
+      failureStage: 'workspace_access',
+      safeDetails: workspaceResult.safeDetails,
+    });
+  }
+
+  const legacyAllowed =
+    (workspaceCode === 'ADMIN_WORKSPACE' &&
+      options.allowLegacyAdminFallback === true &&
+      hasAdminAccess(authContext.employee));
+
+  if (!workspaceResult.hasAccess && !legacyAllowed) {
+    throw new AuthFlowError({
+      status: 403,
+      code: 'workspace_forbidden',
+      message: 'Tài khoản chưa được cấp quyền truy cập.',
+      failureStage: 'workspace_access',
+      safeDetails: {
+        workspace_code: workspaceCode,
+      },
+    });
+  }
+
+  if (!workspaceResult.hasAccess && legacyAllowed) {
+    logAuthorizationDiagnostic({
+      stage: 'workspace_access',
+      code: 'legacy_workspace_fallback',
+      workspace: workspaceCode,
+      employee_lookup_result_count: 1,
+    });
+  }
+
+  return authContext;
+}
+
+export async function requirePermission(permissionCode: string): Promise<AuthContext> {
+  const authContext = await requireAuthenticatedEmployee();
+  const permissionResult = await lookupPermissionAccess(authContext, permissionCode);
+
+  if (!permissionResult.ok) {
+    throw new AuthFlowError({
+      status: 500,
+      code: 'admin_verification_failed',
+      message: 'Không thể xác minh quyền truy cập. Vui lòng thử lại.',
+      failureStage: 'permission_check',
+      safeDetails: permissionResult.safeDetails,
+    });
+  }
+
+  if (!permissionResult.hasAccess) {
+    throw new AuthFlowError({
+      status: 403,
+      code: 'permission_forbidden',
+      message: 'Bạn không có quyền thực hiện thao tác này.',
+      failureStage: 'permission_check',
+      safeDetails: {
+        permission_check_result: 'denied',
+      },
+    });
+  }
+
+  return authContext;
 }
 
 export function toPublicStaffEmployee(employee: ServerEmployee) {
@@ -322,17 +543,26 @@ export async function requireAdminEmployee(): Promise<AuthContext> {
   }
 
   const authContext = result.authContext;
+  const adminDecision = await canAccessAdmin(authContext);
 
-  if (!hasAdminAccess(authContext.employee)) {
+  if (!adminDecision.allowed) {
     throw new AuthFlowError({
       status: 403,
       code: 'admin_forbidden',
       message: 'Bạn không có quyền truy cập khu vực quản trị.',
-      failureStage: 'admin_role',
+      failureStage: 'workspace_access',
       safeDetails: {
         get_user_success: true,
         employee_lookup_result_count: 1,
       },
+    });
+  }
+
+  if (adminDecision.viaLegacyFallback) {
+    logAuthorizationDiagnostic({
+      stage: 'workspace_access',
+      code: 'legacy_admin_fallback',
+      employee_lookup_result_count: 1,
     });
   }
 

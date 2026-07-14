@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Banknote, ClipboardList, Clock, RefreshCcw, User } from 'lucide-react';
+import Link from 'next/link';
+import { Banknote, BriefcaseBusiness, ClipboardList, Clock, LayoutDashboard, RefreshCcw, User } from 'lucide-react';
 import { StaffAttendanceContent } from '../attendance/AttendanceView';
 import { StaffTasksContent } from '../tasks/TasksView';
 import { StaffExpensesContent } from '../expenses/ExpensesView';
@@ -13,11 +14,16 @@ import type { Facility } from '@/lib/types/facility';
 interface StaffPortalContentProps {
   workerData: Employee;
   assignedBranchData: Facility | null;
+  capabilities?: {
+    canAccessAdmin: boolean;
+    canAccessStaff: boolean;
+  };
 }
 
 export default function StaffPortalContent({
   workerData,
   assignedBranchData,
+  capabilities,
 }: StaffPortalContentProps) {
   const [worker] = useState<Employee | null>(workerData);
   const [assignedBranch] = useState<Facility | null>(assignedBranchData);
@@ -29,6 +35,9 @@ export default function StaffPortalContent({
     expenses: false,
     profile: false,
   });
+  const canSwitchWorkspace = Boolean(
+    capabilities?.canAccessAdmin && capabilities?.canAccessStaff
+  );
 
   useEffect(() => {
     setVisitedTabs((prev) =>
@@ -71,6 +80,24 @@ export default function StaffPortalContent({
             <p className="text-[10px] text-slate-500 font-mono mt-0.5">{worker?.title || 'Kỹ thuật viên'}</p>
           </div>
         </div>
+        {canSwitchWorkspace && (
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Link
+              href="/admin/dashboard"
+              className="inline-flex items-center justify-center gap-2 rounded-md border border-blue-500/30 bg-blue-500/10 px-3 py-2 text-[11px] font-bold text-blue-200 hover:bg-blue-500/15"
+            >
+              <LayoutDashboard className="h-3.5 w-3.5" />
+              Chuyển sang khu vực quản trị
+            </Link>
+            <Link
+              href="/staff"
+              className="inline-flex items-center justify-center gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-[11px] font-bold text-emerald-200 hover:bg-emerald-500/15"
+            >
+              <BriefcaseBusiness className="h-3.5 w-3.5" />
+              Chuyển sang khu vực nhân viên
+            </Link>
+          </div>
+        )}
       </div>
 
       <div className={tabClasses.attendance}>

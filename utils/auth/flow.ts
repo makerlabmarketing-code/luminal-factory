@@ -1,7 +1,7 @@
 export const AUTH_CALLBACK_PATH = '/auth/callback';
 export const UPDATE_PASSWORD_PATH = '/auth/update-password';
 export const ADMIN_DASHBOARD_PATH = '/admin/dashboard';
-export const STAFF_PORTAL_PATH = '/staff/portal';
+export const STAFF_PORTAL_PATH = '/staff';
 
 const allowedRedirectPaths = new Set([
   AUTH_CALLBACK_PATH,

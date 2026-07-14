@@ -463,10 +463,14 @@ describe('admin login flow', () => {
     expect(serverAuthSource).toMatch(/ADMIN_EMPLOYEE_AUTH_SELECT =\n  'id, auth_user_id, role, status, is_active'/);
     expect(serverAuthSource).toMatch(/getServerAuthContextLookup\(ADMIN_EMPLOYEE_AUTH_SELECT\)/);
     expect(serverAuthSource).not.toMatch(/ADMIN_EMPLOYEE_AUTH_SELECT =\n  '.*employee_id/);
+    expect(serverAuthSource).toMatch(/ADMIN_WORKSPACE/);
+    expect(serverAuthSource).toMatch(/STAFF_WORKSPACE/);
+    expect(serverAuthSource).toMatch(/employee_workspace_access/);
+    expect(serverAuthSource).toMatch(/employee_permissions/);
     expect(serverAuthSource).toMatch(/role === 'ADMIN'/);
     expect(serverAuthSource).toMatch(/role === 'OWNER'/);
     expect(serverAuthSource).toMatch(/isActiveEmployee\(serverEmployee\)/);
-    expect(serverAuthSource).toMatch(/hasAdminAccess\(authContext\.employee\)/);
+    expect(serverAuthSource).toMatch(/canAccessAdmin\(authContext\)/);
     expect(routeSource).toMatch(/status: 200/);
     expect(routeSource).toMatch(/code: 'admin_verified'/);
     expect(routeSource).toMatch(/session_not_verified/);
@@ -475,6 +479,7 @@ describe('admin login flow', () => {
     expect(routeSource).toMatch(/admin_forbidden/);
     expect(routeSource).toMatch(/admin_verification_failed/);
     expect(layoutSource).toMatch(/getServerAdminAuthContext/);
+    expect(layoutSource).toMatch(/canAccessAdmin/);
     expect(layoutSource).toMatch(/dynamic = 'force-dynamic'/);
     expect(layoutSource).toMatch(/revalidate = 0/);
     expect(layoutSource).toMatch(/fetchCache = 'force-no-store'/);
@@ -506,8 +511,8 @@ describe('admin login flow', () => {
     );
 
     expect(layoutSource).toMatch(/if \(!authContext\)/);
-    expect(layoutSource).toMatch(/if \(!hasAdminAccess\(authContext\.employee\)\)/);
-    expect(layoutSource).toMatch(/return <AdminShell>\{children\}<\/AdminShell>/);
+    expect(layoutSource).toMatch(/if \(!adminAccess\.allowed\)/);
+    expect(layoutSource).toMatch(/canAccessAdmin=\{adminAccess\.allowed\}/);
   });
 
   it('keeps the Supabase SSR browser/server/middleware cookie contract aligned', () => {

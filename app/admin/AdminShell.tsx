@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
+  ArrowLeftRight,
+  BriefcaseBusiness,
   CalendarDays,
   ClipboardList,
   Database,
@@ -14,8 +16,19 @@ import {
 } from 'lucide-react';
 import AdminLogoutButton from './AdminLogoutButton';
 
-export default function AdminShell({ children }: { children: React.ReactNode }) {
+interface AdminShellProps {
+  children: React.ReactNode;
+  canAccessAdmin: boolean;
+  canAccessStaff: boolean;
+}
+
+export default function AdminShell({
+  children,
+  canAccessAdmin,
+  canAccessStaff,
+}: AdminShellProps) {
   const pathname = usePathname();
+  const canSwitchWorkspace = canAccessAdmin && canAccessStaff;
 
   const menuGroups = [
     {
@@ -80,7 +93,29 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
           ))}
         </nav>
 
-        <div className="p-4 border-t border-slate-800">
+        <div className="space-y-2 border-t border-slate-800 p-4">
+          {canSwitchWorkspace && (
+            <div className="space-y-1 rounded-lg border border-slate-800 bg-slate-950 p-2">
+              <div className="flex items-center gap-2 px-2 py-1 text-[10px] font-bold text-slate-500">
+                <ArrowLeftRight className="h-3.5 w-3.5" />
+                Chuyển khu vực
+              </div>
+              <Link
+                href="/admin/dashboard"
+                className="flex items-center gap-2 rounded-md px-2 py-2 text-xs font-bold text-blue-300 hover:bg-slate-900"
+              >
+                <LayoutDashboard className="h-3.5 w-3.5" />
+                Chuyển sang khu vực quản trị
+              </Link>
+              <Link
+                href="/staff"
+                className="flex items-center gap-2 rounded-md px-2 py-2 text-xs font-bold text-emerald-300 hover:bg-slate-900"
+              >
+                <BriefcaseBusiness className="h-3.5 w-3.5" />
+                Chuyển sang khu vực nhân viên
+              </Link>
+            </div>
+          )}
           <AdminLogoutButton />
         </div>
       </aside>

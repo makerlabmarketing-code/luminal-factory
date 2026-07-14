@@ -110,10 +110,15 @@ describe('static security boundaries', () => {
     const serverAuth = readFileSync(join(repositoryRoot, 'services/server/auth.ts'), 'utf8');
 
     expect(adminLayout).toMatch(/getServerAdminAuthContext/);
-    expect(adminLayout).toMatch(/hasAdminAccess/);
+    expect(adminLayout).toMatch(/canAccessAdmin/);
+    expect(adminLayout).toMatch(/canAccessStaff/);
     expect(adminAuthRoute).toMatch(/requireAdminEmployee/);
     expect(adminAuthRoute).not.toMatch(/passcode/);
     expect(serverAuth).toMatch(/\.eq\(['"]auth_user_id['"],\s*user\.id\)/);
+    expect(serverAuth).toMatch(/employee_workspace_access/);
+    expect(serverAuth).toMatch(/employee_permissions/);
+    expect(serverAuth).toMatch(/ADMIN_WORKSPACE/);
+    expect(serverAuth).toMatch(/STAFF_WORKSPACE/);
     expect(serverAuth).toMatch(/role === 'ADMIN'/);
   });
 
@@ -173,6 +178,30 @@ describe('static security boundaries', () => {
     expect(source).toMatch(/href: '\/admin\/dashboard'/);
     expect(source).toMatch(/href: '\/staff'/);
     expect(source).not.toMatch(/staff\/portal\?token=|localStorage|sessionStorage/);
+  });
+
+  it('keeps runtime permission decisions on the server', () => {
+    const serverAuth = readFileSync(join(repositoryRoot, 'services/server/auth.ts'), 'utf8');
+    const adminShell = readFileSync(join(repositoryRoot, 'app/admin/AdminShell.tsx'), 'utf8');
+    const staffPortal = readFileSync(join(repositoryRoot, 'app/staff/portal/StaffPortalContent.tsx'), 'utf8');
+
+    expect(serverAuth).toMatch(/export async function hasWorkspaceAccess/);
+    expect(serverAuth).toMatch(/export async function hasPermission/);
+    expect(serverAuth).toMatch(/const hasDeny/);
+    expect(serverAuth).toMatch(/!hasDeny && hasAllow/);
+    expect(adminShell).not.toMatch(/localStorage|sessionStorage/);
+    expect(staffPortal).not.toMatch(/localStorage|sessionStorage/);
+  });
+
+  it('redirects the legacy staff portal path to the staff home without a loop', () => {
+    const staffHome = readFileSync(join(repositoryRoot, 'app/staff/page.tsx'), 'utf8');
+    const staffPortal = readFileSync(join(repositoryRoot, 'app/staff/portal/page.tsx'), 'utf8');
+    const authFlow = readFileSync(join(repositoryRoot, 'utils/auth/flow.ts'), 'utf8');
+
+    expect(staffHome).toMatch(/StaffPortalContent/);
+    expect(staffHome).not.toMatch(/redirect\(['"]\/staff\/portal['"]\)/);
+    expect(staffPortal).toMatch(/redirect\(queryString \? `\/staff\?\$\{queryString\}` : '\/staff'\)/);
+    expect(authFlow).toMatch(/STAFF_PORTAL_PATH = '\/staff'/);
   });
 
   it('does not turn dashboard query errors into empty financial data', () => {

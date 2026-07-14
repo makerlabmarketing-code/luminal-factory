@@ -1,13 +1,21 @@
-import { Suspense } from 'react';
-import StaffPortalContent from './StaffPortalContent';
-import { getAuthenticatedStaffPortalData } from '@/services/server/staffPortalData';
+import { redirect } from 'next/navigation';
 
-export default async function WorkerPortal() {
-  const portalData = await getAuthenticatedStaffPortalData();
+export default function WorkerPortal({
+  searchParams,
+}: {
+  searchParams?: Record<string, string | string[] | undefined>;
+}) {
+  const params = new URLSearchParams();
 
-  return (
-    <Suspense fallback={<div className="min-h-screen bg-slate-950 flex justify-center items-center text-slate-500 text-xs font-mono">Đang đồng bộ cổng Portal...</div>}>
-      <StaffPortalContent workerData={portalData.employee} assignedBranchData={portalData.assignedBranch} />
-    </Suspense>
-  );
+  Object.entries(searchParams || {}).forEach(([key, value]) => {
+    if (Array.isArray(value)) {
+      value.forEach((entry) => params.append(key, entry));
+      return;
+    }
+
+    if (value !== undefined) params.set(key, value);
+  });
+
+  const queryString = params.toString();
+  redirect(queryString ? `/staff?${queryString}` : '/staff');
 }

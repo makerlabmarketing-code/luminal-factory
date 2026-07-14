@@ -3,7 +3,9 @@ import 'server-only';
 import { createClient } from '@/utils/supabase/server';
 import type { Facility } from '@/lib/types/facility';
 import {
-  requireAuthenticatedEmployee,
+  canAccessAdmin,
+  canAccessStaff,
+  requireWorkspaceAccess,
   type ServerEmployee,
   toPublicStaffEmployee,
 } from '@/services/server/auth';
@@ -40,11 +42,19 @@ async function getMetadataBranches(): Promise<Facility[]> {
 }
 
 export async function getAuthenticatedStaffPortalData() {
-  const authContext = await requireAuthenticatedEmployee();
-  const branches = await getMetadataBranches();
+  const authContext = await requireWorkspaceAccess('STAFF_WORKSPACE');
+  const [branches, adminAccess, staffAccess] = await Promise.all([
+    getMetadataBranches(),
+    canAccessAdmin(authContext),
+    canAccessStaff(authContext),
+  ]);
 
   return {
     employee: toPublicStaffEmployee(authContext.employee),
     assignedBranch: findAssignedBranch(authContext.employee, branches),
+    capabilities: {
+      canAccessAdmin: adminAccess.allowed,
+      canAccessStaff: staffAccess.allowed,
+    },
   };
 }
