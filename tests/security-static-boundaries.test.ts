@@ -196,12 +196,26 @@ describe('static security boundaries', () => {
   it('redirects the legacy staff portal path to the staff home without a loop', () => {
     const staffHome = readFileSync(join(repositoryRoot, 'app/staff/page.tsx'), 'utf8');
     const staffPortal = readFileSync(join(repositoryRoot, 'app/staff/portal/page.tsx'), 'utf8');
+    const middleware = readFileSync(join(repositoryRoot, 'middleware.ts'), 'utf8');
     const authFlow = readFileSync(join(repositoryRoot, 'utils/auth/flow.ts'), 'utf8');
 
     expect(staffHome).toMatch(/StaffPortalContent/);
     expect(staffHome).not.toMatch(/redirect\(['"]\/staff\/portal['"]\)/);
+    expect(middleware).toMatch(/pathname === ['"]\/staff\/portal['"]/);
+    expect(middleware).toMatch(/redirectUrl\.pathname = ['"]\/staff['"]/);
+    expect(middleware).toMatch(/NextResponse\.redirect\(redirectUrl,\s*308\)/);
     expect(staffPortal).toMatch(/redirect\(queryString \? `\/staff\?\$\{queryString\}` : '\/staff'\)/);
     expect(authFlow).toMatch(/STAFF_PORTAL_PATH = '\/staff'/);
+  });
+
+  it('does not render the staff login form from the protected staff layout', () => {
+    const staffLayout = readFileSync(join(repositoryRoot, 'app/staff/layout.tsx'), 'utf8');
+
+    expect(staffLayout).toMatch(/getServerAuthContext/);
+    expect(staffLayout).toMatch(/canAccessStaff/);
+    expect(staffLayout).toMatch(/redirect\(['"]\/['"]\)/);
+    expect(staffLayout).not.toMatch(/StaffLoginForm/);
+    expect(staffLayout).not.toMatch(/Vui lòng đăng nhập bằng tài khoản nhân sự/);
   });
 
   it('does not turn dashboard query errors into empty financial data', () => {

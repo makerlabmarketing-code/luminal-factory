@@ -1,12 +1,12 @@
 // app/staff/layout.tsx
-import StaffLoginForm from './StaffLoginForm';
+import { redirect } from 'next/navigation';
 import { canAccessStaff, getServerAuthContext } from '@/services/server/auth';
 
 export default async function StaffLayout({ children }: { children: React.ReactNode }) {
   const authContext = await getServerAuthContext();
 
   if (!authContext) {
-    return <StaffLoginForm message="Vui lòng đăng nhập bằng tài khoản nhân sự." />;
+    redirect('/');
   }
 
   const staffAccess = await canAccessStaff(authContext);
