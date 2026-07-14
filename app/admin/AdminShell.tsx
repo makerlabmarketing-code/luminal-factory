@@ -10,7 +10,6 @@ import {
   Mail,
   MapPin,
   PiggyBank,
-  Settings,
   Users,
 } from 'lucide-react';
 import AdminLogoutButton from './AdminLogoutButton';
@@ -40,7 +39,6 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
       items: [
         { name: 'Quản Lý Danh Mục DB', path: '/admin/metadata', icon: Database },
         { name: 'Mẫu Email Template', path: '/admin/email-editor', icon: Mail },
-        { name: 'Cấu Hình Trung Tâm', path: '/admin/settings', icon: Settings },
       ],
     },
   ];

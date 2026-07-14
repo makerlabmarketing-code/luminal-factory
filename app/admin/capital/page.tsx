@@ -102,11 +102,27 @@ export default function AdminFinancialLedger() {
         if (!subType && contribMeta.data.length > 0) setSubType(contribMeta.data[0].code);
       }
 
-      const { data: setBank } = await supabase.from('system_settings').select('value').eq('key', 'company_bank_code').maybeSingle();
-      if (setBank) setCompanyBankCode(setBank.value);
+      const financeConfigResponse = await fetch('/api/admin/finance/config', {
+        method: 'GET',
+        headers: {
+          Accept: 'application/json',
+        },
+        credentials: 'include',
+        cache: 'no-store',
+      });
 
-      const { data: setAccount } = await supabase.from('system_settings').select('value').eq('key', 'company_bank_account').maybeSingle();
-      if (setAccount) setCompanyBankAccount(setAccount.value);
+      if (financeConfigResponse.ok) {
+        const financeConfig = (await financeConfigResponse.json()) as {
+          companyBankCode?: string;
+          companyBankAccount?: string;
+        };
+
+        setCompanyBankCode(financeConfig.companyBankCode || 'MB');
+        setCompanyBankAccount(financeConfig.companyBankAccount || '');
+      } else {
+        setCompanyBankCode('MB');
+        setCompanyBankAccount('');
+      }
 
       const { data: ledgers, error: ledgerError } = await supabase
         .from('financial_ledger')

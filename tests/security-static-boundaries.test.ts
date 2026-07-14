@@ -177,11 +177,68 @@ describe('static security boundaries', () => {
 
   it('does not turn dashboard query errors into empty financial data', () => {
     const source = readFileSync(join(repositoryRoot, 'app/admin/dashboard/page.tsx'), 'utf8');
+    const serviceSource = readFileSync(
+      join(repositoryRoot, 'services/adminDashboardDataCore.ts'),
+      'utf8'
+    );
 
-    expect(source).toMatch(/data: ledger, error/);
-    expect(source).toMatch(/setLoadError/);
-    expect(source).toMatch(/Không tải được dữ liệu dashboard/);
+    expect(source).toMatch(/AdminDashboardError/);
+    expect(serviceSource).toMatch(/throw new DashboardDataError/);
+    expect(serviceSource).toMatch(/financial_ledger_select/);
+    expect(serviceSource).not.toMatch(/return\s+buildAdminDashboardDto\(\[\]/);
     expect(source).not.toMatch(/console\.error\("Lỗi lấy dữ liệu biểu đồ:/);
+  });
+
+  it('keeps admin dashboard finance queries on the server-side DTO boundary', () => {
+    const pageSource = readFileSync(join(repositoryRoot, 'app/admin/dashboard/page.tsx'), 'utf8');
+    const chartSource = readFileSync(
+      join(repositoryRoot, 'app/admin/dashboard/AdminDashboardCharts.tsx'),
+      'utf8'
+    );
+    const serverServiceSource = readFileSync(
+      join(repositoryRoot, 'services/server/adminDashboardData.ts'),
+      'utf8'
+    );
+
+    expect(pageSource).not.toMatch(/['"]use client['"]/);
+    expect(pageSource).toMatch(/dynamic = 'force-dynamic'/);
+    expect(pageSource).toMatch(/fetchCache = 'force-no-store'/);
+    expect(pageSource).toMatch(/getAdminDashboardDto/);
+    expect(chartSource).toMatch(/['"]use client['"]/);
+    expect(chartSource).not.toMatch(/supabase|from\(['"]financial_ledger['"]\)|from\(['"]office_expenses['"]\)|from\(['"]shareholders['"]\)/);
+    expect(serverServiceSource).toMatch(/requireAdminEmployee/);
+    expect(serverServiceSource).toMatch(/createClient/);
+    expect(serverServiceSource).not.toMatch(/createServerSupabaseClient/);
+  });
+
+  it('does not read or write system settings from runtime source paths', () => {
+    const files = ['app', 'component', 'lib', 'services', 'utils']
+      .flatMap((dir) => collectFiles(join(repositoryRoot, dir)))
+      .filter((file) => !file.endsWith('app/admin/settings/page.tsx'));
+
+    const offenders = files.filter((file) => {
+      const source = readFileSync(file, 'utf8');
+      return /from\(['"]system_settings['"]\)|\.from\(['"]system_settings['"]\)|public\.system_settings/.test(source);
+    });
+
+    expect(offenders).toEqual([]);
+  });
+
+  it('keeps central settings disabled in the admin UI', () => {
+    const adminShell = readFileSync(join(repositoryRoot, 'app/admin/AdminShell.tsx'), 'utf8');
+    const settingsPage = readFileSync(join(repositoryRoot, 'app/admin/settings/page.tsx'), 'utf8');
+
+    expect(adminShell).not.toMatch(/Cấu Hình Trung Tâm|\/admin\/settings/);
+    expect(settingsPage).toMatch(/Cấu hình trung tâm đã tắt/);
+    expect(settingsPage).not.toMatch(/createClient|supabase|system_settings|SMTP_PASS/);
+  });
+
+  it('keeps SMTP secrets in server environment variables instead of database settings', () => {
+    const emailService = readFileSync(join(repositoryRoot, 'services/emailService.ts'), 'utf8');
+
+    expect(emailService).toMatch(/getRequiredEnvValue\(['"]SMTP_HOST['"]\)/);
+    expect(emailService).toMatch(/getRequiredEnvValue\(['"]SMTP_PASS['"]\)/);
+    expect(emailService).not.toMatch(/from\(['"]system_settings['"]\)/);
   });
 
   it('uses the publishable Supabase key even when a legacy anon key is present', () => {

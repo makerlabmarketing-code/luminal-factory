@@ -83,32 +83,17 @@ function getSmtpErrorMessage(error: unknown): string {
   return rawMessage;
 }
 
-export async function getSystemSettingsMap() {
-  const supabase = createServerSupabaseClient();
-  const { data, error } = await supabase.from('system_settings').select('key, value');
-
-  if (error) throw error;
-
-  const settingsMap = new Map<string, string>();
-
-  (data || []).forEach((item) => {
-    if (item?.key) {
-      settingsMap.set(String(item.key).trim().toUpperCase(), String(item.value || '').trim());
-    }
-  });
-
-  return settingsMap;
+function getRequiredEnvValue(key: SystemSettingKey): string {
+  return String(process.env[key] || '').trim();
 }
 
-export async function getSmtpConfig() {
-  const settingsMap = await getSystemSettingsMap();
-
-  const host = (settingsMap.get('SMTP_HOST') || '').toLowerCase();
-  const port = Number(settingsMap.get('SMTP_PORT') || '0');
-  const user = settingsMap.get('SMTP_USER') || '';
-  const rawPass = settingsMap.get('SMTP_PASS') || '';
+export function getSmtpConfig() {
+  const host = getRequiredEnvValue('SMTP_HOST').toLowerCase();
+  const port = Number(getRequiredEnvValue('SMTP_PORT') || '0');
+  const user = getRequiredEnvValue('SMTP_USER');
+  const rawPass = getRequiredEnvValue('SMTP_PASS');
   const pass = normalizeSmtpPassword(rawPass);
-  const fromName = settingsMap.get('SMTP_FROM_NAME') || 'Luminal ERP';
+  const fromName = getRequiredEnvValue('SMTP_FROM_NAME') || 'Luminal ERP';
 
   const missingKeys: SystemSettingKey[] = [];
 
@@ -118,7 +103,7 @@ export async function getSmtpConfig() {
   if (!pass) missingKeys.push('SMTP_PASS');
 
   if (missingKeys.length > 0) {
-    throw new Error(`Thiếu cấu hình SMTP: ${missingKeys.join(', ')}`);
+    throw new Error(`Thiếu cấu hình SMTP trong biến môi trường server: ${missingKeys.join(', ')}`);
   }
 
   if (![465, 587].includes(port)) {

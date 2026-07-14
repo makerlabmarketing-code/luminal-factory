@@ -1,19 +1,15 @@
 # Email Setup
 
-Hệ thống hiện đã đọc cấu hình SMTP từ bảng `system_settings` và dùng cho:
+SMTP hiện được đọc từ biến môi trường server, không đọc từ bảng cấu hình runtime.
 
-- Gửi test mail từ màn `Mẫu Email Template`
-- Ghi log vào `email_history`
-- Cron gửi mail theo `group_type`
-
-## Các key bắt buộc trong `system_settings`
+## Biến môi trường bắt buộc
 
 - `SMTP_HOST`
 - `SMTP_PORT`
 - `SMTP_USER`
 - `SMTP_PASS`
 
-## Key nên bổ sung thêm
+## Biến môi trường tùy chọn
 
 - `SMTP_FROM_NAME`
   Giá trị gợi ý: `Luminal HQ`
@@ -41,14 +37,14 @@ Nếu đang để `456` thì gần như sẽ không gửi được.
 3. Bật `2-Step Verification`.
 4. Tìm `App passwords`.
 5. Tạo app password mới cho mục Mail.
-6. Copy chuỗi 16 ký tự và lưu vào `SMTP_PASS`.
+6. Copy chuỗi 16 ký tự và lưu vào `SMTP_PASS` trong Vercel/server environment.
 
 ## Cách test từ màn Email Template
 
-1. Vào `Mẫu Email Template`
-2. Chọn một template
-3. Bấm nút gửi thử
-4. Nhập email nhận test
+1. Vào `Mẫu Email Template`.
+2. Chọn một template.
+3. Bấm nút gửi thử.
+4. Nhập email nhận test.
 
 Nếu gửi thành công, hệ thống sẽ ghi vào `email_history`.
 
