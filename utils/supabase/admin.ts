@@ -4,7 +4,7 @@ import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { getSupabaseUrl } from './env';
 
 function getSupabaseAdminKey(): string {
-  const key = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const key = process.env.SUPABASE_SECRET_KEY;
 
   if (!key) {
     throw new Error('Thiếu cấu hình Supabase secret key cho thao tác tài khoản.');
