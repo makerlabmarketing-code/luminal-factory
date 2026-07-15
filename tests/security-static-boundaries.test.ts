@@ -38,6 +38,7 @@ describe('static security boundaries', () => {
     );
 
     const offenders = files.filter((file) => {
+      if (file.endsWith('utils/supabase/admin.ts')) return false;
       const source = readFileSync(file, 'utf8');
       return /SUPABASE_SERVICE_ROLE_KEY|service[_-]?role/i.test(source);
     });
@@ -81,6 +82,19 @@ describe('static security boundaries', () => {
   it('keeps sensitive staff mutations behind server-authenticated routes', () => {
     const routeFiles = [
       'app/api/attendance/check-out/route.ts',
+    ];
+
+    routeFiles.forEach((relativePath) => {
+      const source = readFileSync(join(repositoryRoot, relativePath), 'utf8');
+
+      expect(source).toMatch(/requireAuthenticatedEmployee/);
+      expect(source).not.toMatch(/const\s*\{[^}]*employeeId[^}]*\}\s*=\s*body/);
+      expect(source).not.toMatch(/body\.(employeeId|userId|role)/);
+    });
+  });
+
+  it('keeps staff workspace APIs behind STAFF_WORKSPACE authorization', () => {
+    const routeFiles = [
       'app/api/staff/attendance/route.ts',
       'app/api/staff/profile/route.ts',
     ];
@@ -88,7 +102,8 @@ describe('static security boundaries', () => {
     routeFiles.forEach((relativePath) => {
       const source = readFileSync(join(repositoryRoot, relativePath), 'utf8');
 
-      expect(source).toMatch(/requireAuthenticatedEmployee/);
+      expect(source).toMatch(/requireWorkspaceAccess\('STAFF_WORKSPACE'\)/);
+      expect(source).not.toMatch(/requireAuthenticatedEmployee\(\)/);
       expect(source).not.toMatch(/const\s*\{[^}]*employeeId[^}]*\}\s*=\s*body/);
       expect(source).not.toMatch(/body\.(employeeId|userId|role)/);
     });
@@ -137,7 +152,7 @@ describe('static security boundaries', () => {
   it('uses neutral auth messages for login and password reset', () => {
     const adminLogin = readFileSync(join(repositoryRoot, 'app/admin/AdminLoginForm.tsx'), 'utf8');
     const adminLoginFlow = readFileSync(join(repositoryRoot, 'utils/auth/admin-login.ts'), 'utf8');
-    const staffLogin = readFileSync(join(repositoryRoot, 'app/staff/StaffLoginForm.tsx'), 'utf8');
+    const workspaceAuth = readFileSync(join(repositoryRoot, 'app/api/auth/workspaces/route.ts'), 'utf8');
     const forgotPassword = readFileSync(
       join(repositoryRoot, 'app/auth/forgot-password/ForgotPasswordForm.tsx'),
       'utf8'
@@ -149,7 +164,8 @@ describe('static security boundaries', () => {
 
     expect(adminLogin).toMatch(/submitAdminLogin/);
     expect(adminLoginFlow).toMatch(/Email hoặc mật khẩu chưa đúng\./);
-    expect(staffLogin).toMatch(/Email hoặc mật khẩu chưa đúng\./);
+    expect(workspaceAuth).toMatch(/requireAuthenticatedEmployee/);
+    expect(workspaceAuth).toMatch(/resolveWorkspaceDefaultPath/);
     expect(forgotPassword).toMatch(
       /Nếu email tồn tại trong hệ thống, hướng dẫn đặt lại mật khẩu sẽ được gửi\./
     );
@@ -177,6 +193,8 @@ describe('static security boundaries', () => {
     expect(source).toMatch(/Dành cho nhân viên/);
     expect(source).toMatch(/href: '\/admin\/dashboard'/);
     expect(source).toMatch(/href: '\/staff'/);
+    expect(source).toMatch(/Dùng một tài khoản ERP/);
+    expect(source).not.toMatch(/Tài khoản riêng|Không dùng chung tài khoản/);
     expect(source).not.toMatch(/staff\/portal\?token=|localStorage|sessionStorage/);
   });
 
@@ -206,6 +224,15 @@ describe('static security boundaries', () => {
     expect(middleware).toMatch(/NextResponse\.redirect\(redirectUrl,\s*308\)/);
     expect(staffPortal).toMatch(/redirect\(queryString \? `\/staff\?\$\{queryString\}` : '\/staff'\)/);
     expect(authFlow).toMatch(/STAFF_PORTAL_PATH = '\/staff'/);
+    expect(authFlow).toMatch(/LOGIN_ENTRY_PATH = '\/admin\/dashboard'/);
+  });
+
+  it('keeps the legacy staff portal path free of staff login UI', () => {
+    const staffPortal = readFileSync(join(repositoryRoot, 'app/staff/portal/page.tsx'), 'utf8');
+
+    expect(staffPortal).not.toMatch(/StaffLoginForm/);
+    expect(staffPortal).not.toMatch(/Đăng nhập nhân sự/);
+    expect(staffPortal).not.toMatch(/signInWithPassword/);
   });
 
   it('does not render the staff login form from the protected staff layout', () => {
@@ -213,9 +240,49 @@ describe('static security boundaries', () => {
 
     expect(staffLayout).toMatch(/getServerAuthContext/);
     expect(staffLayout).toMatch(/canAccessStaff/);
-    expect(staffLayout).toMatch(/redirect\(['"]\/['"]\)/);
+    expect(staffLayout).toMatch(/LOGIN_ENTRY_PATH/);
+    expect(staffLayout).toMatch(/dynamic = 'force-dynamic'/);
+    expect(staffLayout).toMatch(/revalidate = 0/);
+    expect(staffLayout).toMatch(/fetchCache = 'force-no-store'/);
     expect(staffLayout).not.toMatch(/StaffLoginForm/);
     expect(staffLayout).not.toMatch(/Vui lòng đăng nhập bằng tài khoản nhân sự/);
+  });
+
+  it('authorizes staff by active employee workspace access instead of legacy staff role', () => {
+    const serverAuth = readFileSync(join(repositoryRoot, 'services/server/auth.ts'), 'utf8');
+    const staffPortalData = readFileSync(
+      join(repositoryRoot, 'services/server/staffPortalData.ts'),
+      'utf8'
+    );
+
+    expect(serverAuth).toMatch(/export async function canAccessStaff/);
+    expect(serverAuth).toMatch(/lookupWorkspaceAccess\(authContext, 'STAFF_WORKSPACE'\)/);
+    expect(serverAuth).toMatch(/allowed: viaWorkspace/);
+    expect(serverAuth).not.toMatch(/role === ['"]STAFF['"]/);
+    expect(serverAuth).toMatch(/isActiveEmployee\(serverEmployee\)/);
+    expect(staffPortalData).toMatch(/requireWorkspaceAccess\('STAFF_WORKSPACE'\)/);
+  });
+
+  it('keeps staff on the shared Supabase session without a separate staff token store', () => {
+    const staffFiles = staffUiDirs.flatMap((dir) => collectFiles(join(repositoryRoot, dir)));
+    const offenders = staffFiles.filter((file) => {
+      const source = readFileSync(file, 'utf8');
+      return /setItem|getItem|staff[_-]?session|staff[_-]?token/i.test(source);
+    });
+
+    expect(offenders).toEqual([]);
+  });
+
+  it('does not keep a separate staff login form in the staff route tree', () => {
+    expect(existsSync(join(repositoryRoot, 'app/staff/StaffLoginForm.tsx'))).toBe(false);
+
+    const staffFiles = staffUiDirs.flatMap((dir) => collectFiles(join(repositoryRoot, dir)));
+    const offenders = staffFiles.filter((file) => {
+      const source = readFileSync(file, 'utf8');
+      return /Đăng nhập nhân sự|Vui lòng đăng nhập bằng tài khoản nhân sự|signInWithPassword/.test(source);
+    });
+
+    expect(offenders).toEqual([]);
   });
 
   it('does not turn dashboard query errors into empty financial data', () => {

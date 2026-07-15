@@ -4,17 +4,17 @@ export const ADMIN_LOGIN_MESSAGES = {
   invalidCredentials: 'Email hoặc mật khẩu chưa đúng.',
   unconfirmedSession: 'Phiên đăng nhập chưa được xác nhận. Vui lòng đăng nhập lại.',
   missingEmployee: 'Tài khoản chưa được liên kết với nhân viên.',
-  forbidden: 'Bạn không có quyền truy cập khu vực quản trị.',
-  serverError: 'Không thể xác minh quyền quản trị. Vui lòng thử lại.',
+  forbidden: 'Tài khoản chưa được cấp quyền truy cập.',
+  serverError: 'Không thể xác minh quyền truy cập. Vui lòng thử lại.',
 } as const;
 
 export const ADMIN_LOGIN_STEP_MESSAGES = {
   sign_in_started: 'Đang đăng nhập...',
   sign_in_succeeded: 'Đã xác thực tài khoản.',
-  admin_verify_started: 'Đang xác minh quyền quản trị.',
-  admin_verify_response_status: 'Đã nhận phản hồi xác minh quản trị.',
-  admin_verify_succeeded: 'Đã xác minh quyền quản trị.',
-  navigation_started: 'Đang chuyển tới bảng điều khiển.',
+  admin_verify_started: 'Đang xác minh quyền truy cập.',
+  admin_verify_response_status: 'Đã nhận phản hồi xác minh quyền truy cập.',
+  admin_verify_succeeded: 'Đã xác minh quyền truy cập.',
+  navigation_started: 'Đang chuyển khu vực làm việc.',
 } as const;
 
 export type AdminLoginStep = keyof typeof ADMIN_LOGIN_STEP_MESSAGES;
@@ -48,6 +48,7 @@ interface AdminSessionVerificationResponse {
   json(): Promise<{
     error?: string;
     code?: string;
+    redirectPath?: string;
     status?: number;
   }>;
 }
@@ -80,7 +81,7 @@ function toAdminVerificationMessage(
 }
 
 export async function verifyAdminSessionWithApi(): Promise<AdminSessionVerificationResponse> {
-  return fetch('/api/admin/auth', {
+  return fetch('/api/auth/workspaces', {
     method: 'POST',
     headers: {
       Accept: 'application/json',
@@ -121,10 +122,11 @@ export async function submitAdminLogin({
     const verificationResponse = await verifyAdminSession();
     onStep?.('admin_verify_response_status', verificationResponse.status);
     if (verificationResponse.ok) {
+      const verificationPayload = await verificationResponse.json();
       onStep?.('admin_verify_succeeded');
       return {
         ok: true,
-        redirectPath: ADMIN_DASHBOARD_PATH,
+        redirectPath: verificationPayload.redirectPath || ADMIN_DASHBOARD_PATH,
       };
     }
 

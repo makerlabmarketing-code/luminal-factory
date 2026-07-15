@@ -1,12 +1,17 @@
 // app/staff/layout.tsx
 import { redirect } from 'next/navigation';
 import { canAccessStaff, getServerAuthContext } from '@/services/server/auth';
+import { LOGIN_ENTRY_PATH } from '@/utils/auth/flow';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const fetchCache = 'force-no-store';
 
 export default async function StaffLayout({ children }: { children: React.ReactNode }) {
   const authContext = await getServerAuthContext();
 
   if (!authContext) {
-    redirect('/');
+    redirect(LOGIN_ENTRY_PATH);
   }
 
   const staffAccess = await canAccessStaff(authContext);

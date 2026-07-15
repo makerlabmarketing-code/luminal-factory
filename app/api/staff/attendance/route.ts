@@ -14,7 +14,7 @@ import type { Facility } from '@/lib/types/facility';
 import { calculateHoursFromStrings, calculateSalary } from '@/services/payrollService';
 import {
   AuthFlowError,
-  requireAuthenticatedEmployee,
+  requireWorkspaceAccess,
   type ServerEmployee,
 } from '@/services/server/auth';
 
@@ -200,7 +200,7 @@ function toErrorResponse(error: unknown) {
 
 export async function GET(request: Request) {
   try {
-    const authContext = await requireAuthenticatedEmployee();
+    const authContext = await requireWorkspaceAccess('STAFF_WORKSPACE');
     const url = new URL(request.url);
     const monthInput =
       url.searchParams.get('month') ||
@@ -216,7 +216,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const authContext = await requireAuthenticatedEmployee();
+    const authContext = await requireWorkspaceAccess('STAFF_WORKSPACE');
     const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
     const userLat = Number(body?.userLat);
     const userLng = Number(body?.userLng);

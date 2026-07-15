@@ -13,12 +13,14 @@ import {
   navigateAfterLogout,
   signOutCurrentDevice,
 } from '../utils/auth/logout';
+import { resolveWorkspaceDefaultPath } from '../utils/auth/flow';
 
 function verificationResponse(
   ok: boolean,
   status: number,
   error?: string,
-  code?: string
+  code?: string,
+  redirectPath = '/admin/dashboard'
 ) {
   return {
     ok,
@@ -26,6 +28,7 @@ function verificationResponse(
     json: vi.fn().mockResolvedValue({
       ...(error ? { error } : {}),
       ...(code ? { code } : {}),
+      ...(ok ? { redirectPath } : {}),
       status,
     }),
   };
@@ -54,7 +57,7 @@ describe('admin login flow', () => {
     expect(verifyAdminSession).toHaveBeenCalledTimes(1);
   });
 
-  it('calls the admin verification endpoint with the required fetch contract', async () => {
+  it('calls the workspace verification endpoint with the required fetch contract', async () => {
     const originalFetch = globalThis.fetch;
     const fetchMock = vi.fn().mockResolvedValue(verificationResponse(true, 200));
     globalThis.fetch = fetchMock;
@@ -62,7 +65,7 @@ describe('admin login flow', () => {
     await verifyAdminSessionWithApi();
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(fetchMock).toHaveBeenCalledWith('/api/admin/auth', {
+    expect(fetchMock).toHaveBeenCalledWith('/api/auth/workspaces', {
       method: 'POST',
       headers: {
         Accept: 'application/json',
@@ -181,7 +184,7 @@ describe('admin login flow', () => {
     });
   });
 
-  it('reports when the employee does not have ADMIN access', async () => {
+  it('reports when the employee does not have any workspace access', async () => {
     const result = await submitAdminLogin({
       auth: {
         signInWithPassword: vi.fn().mockResolvedValue({
@@ -193,7 +196,9 @@ describe('admin login flow', () => {
       password: 'mat-khau',
       verifyAdminSession: vi
         .fn()
-        .mockResolvedValue(verificationResponse(false, 403, ADMIN_LOGIN_MESSAGES.forbidden)),
+        .mockResolvedValue(
+          verificationResponse(false, 403, ADMIN_LOGIN_MESSAGES.forbidden, 'workspace_forbidden')
+        ),
     });
 
     expect(result).toEqual({
@@ -225,7 +230,7 @@ describe('admin login flow', () => {
     });
   });
 
-  it('redirects a valid ADMIN to the dashboard', async () => {
+  it('redirects a valid ADMIN workspace session to the dashboard', async () => {
     const onStep = vi.fn();
     const result = await submitAdminLogin({
       auth: {
@@ -249,6 +254,27 @@ describe('admin login flow', () => {
     expect(onStep).toHaveBeenNthCalledWith(3, 'admin_verify_started');
     expect(onStep).toHaveBeenNthCalledWith(4, 'admin_verify_response_status', 200);
     expect(onStep).toHaveBeenNthCalledWith(5, 'admin_verify_succeeded');
+  });
+
+  it('redirects a valid staff-only workspace session to staff home', async () => {
+    const result = await submitAdminLogin({
+      auth: {
+        signInWithPassword: vi.fn().mockResolvedValue({
+          data: { session: { id: 'session' }, user: { id: 'auth-user-id' } },
+          error: null,
+        }),
+      },
+      email: 'staff@luminalfactory.com',
+      password: 'mat-khau',
+      verifyAdminSession: vi
+        .fn()
+        .mockResolvedValue(verificationResponse(true, 200, undefined, undefined, '/staff')),
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      redirectPath: '/staff',
+    });
   });
 
   it('uses document navigation to avoid stale admin dashboard payloads', () => {
@@ -281,6 +307,14 @@ describe('admin login flow', () => {
 
     expect(result).toEqual({ ok: true });
     expect(signOut).toHaveBeenCalledTimes(1);
+    expect(signOut).toHaveBeenCalledWith({ scope: 'local' });
+  });
+
+  it('uses one Supabase logout path for both admin and staff workspaces', async () => {
+    const signOut = vi.fn().mockResolvedValue({ error: null });
+
+    await signOutCurrentDevice({ signOut });
+
     expect(signOut).toHaveBeenCalledWith({ scope: 'local' });
   });
 
@@ -408,7 +442,7 @@ describe('admin login flow', () => {
     expect(source).toMatch(/setAuthStep\('navigation_started'\)/);
     expect(source).toMatch(/authStep === 'admin_verify_response_status'/);
     expect(ADMIN_LOGIN_STEP_MESSAGES.navigation_started).toBe(
-      'Đang chuyển tới bảng điều khiển.'
+      'Đang chuyển khu vực làm việc.'
     );
   });
 
@@ -502,6 +536,22 @@ describe('admin login flow', () => {
     expect(logoutSource).toMatch(/Đang đăng xuất\.\.\./);
     expect(logoutSource).toMatch(/router\.refresh\(\)/);
     expect(logoutSource).toMatch(/navigateAfterLogout\('\/'\)/);
+  });
+
+  it('keeps dual-workspace default navigation on admin while allowing staff switch links', () => {
+    const adminShell = readFileSync(
+      join(__dirname, '../app/admin/AdminShell.tsx'),
+      'utf8'
+    );
+
+    expect(
+      resolveWorkspaceDefaultPath({
+        canAccessAdmin: true,
+        canAccessStaff: true,
+      })
+    ).toBe('/admin/dashboard');
+    expect(adminShell).toMatch(/href="\/staff"/);
+    expect(adminShell).toMatch(/Chuyển sang khu vực nhân viên/);
   });
 
   it('does not render the admin login form for a valid admin context', () => {

@@ -71,13 +71,13 @@ export default function AdminLoginForm({ message }: AdminLoginFormProps) {
           <div className="w-12 h-12 bg-blue-500/10 text-blue-500 rounded-full flex items-center justify-center mx-auto border border-blue-500/20">
             <KeyRound className="w-6 h-6" />
           </div>
-          <h2 className="text-sm font-bold">Đăng nhập quản trị</h2>
+          <h2 className="text-sm font-bold">Đăng nhập ERP</h2>
         </div>
 
         <div className="space-y-2">
           <input
             type="email"
-            placeholder="Email quản trị"
+            placeholder="Email"
             className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-200 focus:outline-none focus:border-blue-600 transition"
             value={email}
             onChange={(event) => setEmail(event.target.value)}

@@ -7,6 +7,7 @@ import {
   buildPasswordRecoveryRedirectUrl,
   getConfiguredAppBaseUrl,
   parseAuthCallbackAction,
+  resolveWorkspaceDefaultPath,
   resolveSafeRedirectPath,
   validateNewPassword,
 } from '../utils/auth/flow';
@@ -75,6 +76,42 @@ describe('auth flow helpers', () => {
     expect(resolveSafeRedirectPath('//example.com', ADMIN_DASHBOARD_PATH)).toBe(
       ADMIN_DASHBOARD_PATH
     );
+  });
+
+  it('defaults dual-workspace users to admin after login', () => {
+    expect(
+      resolveWorkspaceDefaultPath({
+        canAccessAdmin: true,
+        canAccessStaff: true,
+      })
+    ).toBe('/admin/dashboard');
+  });
+
+  it('defaults staff-only users to staff after login', () => {
+    expect(
+      resolveWorkspaceDefaultPath({
+        canAccessAdmin: false,
+        canAccessStaff: true,
+      })
+    ).toBe('/staff');
+  });
+
+  it('defaults admin-only users to admin after login', () => {
+    expect(
+      resolveWorkspaceDefaultPath({
+        canAccessAdmin: true,
+        canAccessStaff: false,
+      })
+    ).toBe('/admin/dashboard');
+  });
+
+  it('defaults users without workspace access to the shared login entry', () => {
+    expect(
+      resolveWorkspaceDefaultPath({
+        canAccessAdmin: false,
+        canAccessStaff: false,
+      })
+    ).toBe('/admin/dashboard');
   });
 
   it('builds reset links through the callback route', () => {

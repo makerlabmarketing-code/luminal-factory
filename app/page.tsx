@@ -14,7 +14,7 @@ const accountOptions = [
   },
   {
     title: 'Dành cho nhân viên',
-    subtitle: 'Tài khoản riêng',
+    subtitle: 'Khu vực nhân viên',
     description:
       'Xem công việc, dự án được giao, lịch làm, chấm công, thông báo và hồ sơ cá nhân.',
     href: '/staff',
@@ -36,7 +36,7 @@ export default function GatewayPage() {
             Chọn khu vực đăng nhập
           </h1>
           <p className="max-w-2xl text-sm leading-6 text-slate-400">
-            Sử dụng tài khoản được cấp riêng cho từng vai trò. Không dùng chung tài khoản hoặc đường dẫn bí mật.
+            Dùng một tài khoản ERP và hệ thống sẽ mở khu vực phù hợp với quyền được cấp.
           </p>
         </header>
 

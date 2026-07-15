@@ -1,5 +1,6 @@
 export const AUTH_CALLBACK_PATH = '/auth/callback';
 export const UPDATE_PASSWORD_PATH = '/auth/update-password';
+export const LOGIN_ENTRY_PATH = '/admin/dashboard';
 export const ADMIN_DASHBOARD_PATH = '/admin/dashboard';
 export const STAFF_PORTAL_PATH = '/staff';
 
@@ -10,6 +11,11 @@ const allowedRedirectPaths = new Set([
   STAFF_PORTAL_PATH,
   '/',
 ]);
+
+interface WorkspaceDefaultAccess {
+  canAccessAdmin: boolean;
+  canAccessStaff: boolean;
+}
 
 export interface PasswordValidationResult {
   ok: boolean;
@@ -118,6 +124,16 @@ export function resolveSafeRedirectPath(
   fallbackPath = ADMIN_DASHBOARD_PATH
 ): string {
   return isSafeInternalRedirectPath(value) ? value! : fallbackPath;
+}
+
+export function resolveWorkspaceDefaultPath({
+  canAccessAdmin,
+  canAccessStaff,
+}: WorkspaceDefaultAccess): string {
+  if (canAccessAdmin) return ADMIN_DASHBOARD_PATH;
+  if (canAccessStaff) return STAFF_PORTAL_PATH;
+
+  return LOGIN_ENTRY_PATH;
 }
 
 export function parseAuthCallbackAction(searchParams: URLSearchParams): AuthCallbackAction {

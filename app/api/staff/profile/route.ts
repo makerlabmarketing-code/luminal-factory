@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
-import { AuthFlowError, requireAuthenticatedEmployee } from '@/services/server/auth';
+import { AuthFlowError, requireWorkspaceAccess } from '@/services/server/auth';
 
 const MAX_PROFILE_FIELD_LENGTH = 120;
 
@@ -20,7 +20,7 @@ function toErrorResponse(error: unknown) {
 
 export async function PATCH(request: Request) {
   try {
-    const authContext = await requireAuthenticatedEmployee();
+    const authContext = await requireWorkspaceAccess('STAFF_WORKSPACE');
     const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
 
     if (!body) {

@@ -11,7 +11,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const authContext = await getServerAdminAuthContext();
 
   if (!authContext) {
-    return <AdminLoginForm message="Vui lòng đăng nhập bằng tài khoản quản trị." />;
+    return <AdminLoginForm message="Vui lòng đăng nhập bằng tài khoản ERP." />;
   }
 
   const [adminAccess, staffAccess] = await Promise.all([
