@@ -20,8 +20,36 @@ export const ATTENDANCE_SELECT =
 export const ATTENDANCE_LOG_SELECT =
   'id, employee_id, check_in_time, check_out_time, hours_worked, earnings_today, status';
 export const EMPLOYEE_SELECT =
-  'id, full_name, title, status, hourly_rate, base_salary_per_hour';
+  'id, full_name, title, status';
 export const SHIFT_SELECT = 'id, shift_name, start_time, end_time';
+
+export type AttendanceFailureStage =
+  | 'attendance_range_parse'
+  | 'attendance_select'
+  | 'attendance_logs_select'
+  | 'employee_directory_select'
+  | 'shifts_select'
+  | 'attendance_mapping';
+
+export class AttendanceDataError extends Error {
+  code: 'attendance_load_failed' | 'attendance_mapping_failed' | 'attendance_configuration_failed';
+  failureStage: AttendanceFailureStage;
+  supabaseErrorCode?: string | null;
+
+  constructor(params: {
+    code?: 'attendance_load_failed' | 'attendance_mapping_failed' | 'attendance_configuration_failed';
+    failureStage: AttendanceFailureStage;
+    message: string;
+    cause?: unknown;
+    supabaseErrorCode?: string | null;
+  }) {
+    super(params.message);
+    this.name = 'AttendanceDataError';
+    this.code = params.code || 'attendance_load_failed';
+    this.failureStage = params.failureStage;
+    this.supabaseErrorCode = params.supabaseErrorCode ?? supabaseErrorCode(params.cause);
+  }
+}
 
 interface AttendanceLogRow {
   id: number | string;
@@ -72,9 +100,37 @@ function toNumberOrNull(value: number | string | null | undefined): number | nul
   return Number.isFinite(numericValue) && numericValue >= 0 ? numericValue : null;
 }
 
+function supabaseErrorCode(error: unknown): string | null {
+  if (error && typeof error === 'object' && 'code' in error) {
+    const code = (error as { code?: unknown }).code;
+    return typeof code === 'string' ? code : null;
+  }
+
+  return null;
+}
+
+function throwQueryError(stage: AttendanceFailureStage, error: unknown): never {
+  throw new AttendanceDataError({
+    failureStage: stage,
+    message: 'Không thể tải dữ liệu chấm công.',
+    cause: error,
+  });
+}
+
 function getMonthRange(monthInput: string): AttendanceQueryRange {
-  const month = businessMonthFromDateInput(monthInput);
-  const monthRange = businessMonthRange(month);
+  let monthRange;
+
+  try {
+    const month = businessMonthFromDateInput(monthInput);
+    monthRange = businessMonthRange(month);
+  } catch (error) {
+    throw new AttendanceDataError({
+      code: 'attendance_configuration_failed',
+      failureStage: 'attendance_range_parse',
+      message: 'Kỳ chấm công không hợp lệ.',
+      cause: error,
+    });
+  }
 
   return {
     startDate: formatBusinessDateInput(monthRange.localStart),
@@ -103,6 +159,26 @@ function attendanceLogToRecord(log: AttendanceLogRow): AttendanceRecord | null {
     status: log.status || null,
     source: 'attendance_logs',
   });
+}
+
+function mapAttendanceRows(rows: AttendanceRecord[], logRows: AttendanceLogRow[]) {
+  try {
+    const attendanceRecords = rows.map((record) =>
+      enrichAttendanceRecord({ ...record, source: 'attendance' })
+    );
+    const legacyLogRecords = logRows
+      .map(attendanceLogToRecord)
+      .filter((record): record is AttendanceRecord => Boolean(record));
+
+    return { attendanceRecords, legacyLogRecords };
+  } catch (error) {
+    throw new AttendanceDataError({
+      code: 'attendance_mapping_failed',
+      failureStage: 'attendance_mapping',
+      message: 'Không thể xử lý dữ liệu chấm công.',
+      cause: error,
+    });
+  }
 }
 
 export async function loadAttendanceData(params: {
@@ -140,18 +216,16 @@ export async function loadAttendanceData(params: {
     includeDirectory ? supabase.from('shifts').select(SHIFT_SELECT).order('start_time') : Promise.resolve(null),
   ]);
 
-  if (attendanceResult.error) throw attendanceResult.error;
-  if (logResult.error) throw logResult.error;
-  if (employeeResult?.error) throw employeeResult.error;
-  if (shiftResult?.error) throw shiftResult.error;
+  if (attendanceResult.error) throwQueryError('attendance_select', attendanceResult.error);
+  if (logResult.error) throwQueryError('attendance_logs_select', logResult.error);
+  if (employeeResult?.error) throwQueryError('employee_directory_select', employeeResult.error);
+  if (shiftResult?.error) throwQueryError('shifts_select', shiftResult.error);
 
-  const attendanceRecords = ((attendanceResult.data || []) as AttendanceRecord[]).map((record) =>
-    enrichAttendanceRecord({ ...record, source: 'attendance' })
+  const { attendanceRecords, legacyLogRecords } = mapAttendanceRows(
+    (attendanceResult.data || []) as AttendanceRecord[],
+    (logResult.data || []) as AttendanceLogRow[]
   );
-  const logRecords = ((logResult.data || []) as AttendanceLogRow[])
-    .map(attendanceLogToRecord)
-    .filter((record): record is AttendanceRecord => Boolean(record));
-  const mergedRecords = mergeAttendanceRecords([...attendanceRecords, ...logRecords]).sort((a, b) => {
+  const mergedRecords = mergeAttendanceRecords([...attendanceRecords, ...legacyLogRecords]).sort((a, b) => {
     if (a.work_date !== b.work_date) return b.work_date.localeCompare(a.work_date);
     return String(b.id).localeCompare(String(a.id));
   });
@@ -162,7 +236,7 @@ export async function loadAttendanceData(params: {
     attendanceRecords: mergedRecords,
     sourceCounts: {
       attendance: attendanceRecords.length,
-      attendanceLogs: logRecords.length,
+      attendanceLogs: legacyLogRecords.length,
     },
   };
 }

@@ -15,7 +15,7 @@ async function createBrowserDataClient() {
 }
 
 export function getEmployeeHourlyRate(employee: Employee | undefined | null): number {
-  return Number(employee?.hourly_rate || employee?.base_salary_per_hour || 30000);
+  return Number(employee?.hourly_rate || 30000);
 }
 
 export function normalizeTimeValue(value: string | null | undefined): string | null {

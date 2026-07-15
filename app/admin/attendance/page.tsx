@@ -41,6 +41,26 @@ interface AdminAttendancePayload {
   permissions?: {
     canAdjustAttendance: boolean;
   };
+  error?: string;
+  code?: string;
+  failure_stage?: string;
+  supabase_error_code?: string | null;
+}
+
+function messageForAttendanceLoadError(payload: AdminAttendancePayload | null): string {
+  if (payload?.code === 'attendance_permission_denied') {
+    return 'Bạn không có quyền xem dữ liệu chấm công.';
+  }
+
+  if (payload?.code === 'attendance_mapping_failed') {
+    return 'Không thể xử lý dữ liệu chấm công.';
+  }
+
+  if (payload?.code === 'attendance_configuration_failed') {
+    return payload.error || 'Cấu hình chấm công chưa hợp lệ.';
+  }
+
+  return payload?.error || 'Không thể tải dữ liệu chấm công.';
 }
 
 export default function AdminAttendanceManagement() {
@@ -76,12 +96,10 @@ export default function AdminAttendanceManagement() {
       const response = await fetch(`/api/admin/attendance?month=${encodeURIComponent(monthInput)}`, {
         cache: 'no-store',
       });
-      const payload = (await response.json().catch(() => null)) as AdminAttendancePayload & {
-        error?: string;
-      } | null;
+      const payload = (await response.json().catch(() => null)) as AdminAttendancePayload | null;
 
       if (!response.ok || !payload) {
-        throw new Error(payload?.error || 'Không thể tải dữ liệu chấm công.');
+        throw new Error(messageForAttendanceLoadError(payload));
       }
 
       setEmployees(payload.employees || []);
@@ -215,6 +233,13 @@ export default function AdminAttendanceManagement() {
         <div className="rounded-2xl border border-red-500/30 bg-red-950/20 px-4 py-3 text-xs text-red-100">
           <p className="font-bold text-red-300">Không thể tải dữ liệu chấm công</p>
           <p className="mt-1 text-red-100/80">{loadError}</p>
+          <button
+            type="button"
+            onClick={() => void loadData()}
+            className="mt-3 rounded-lg border border-red-400/30 bg-red-950/40 px-3 py-1.5 text-[11px] font-bold text-red-100 hover:bg-red-900/40"
+          >
+            Thử lại
+          </button>
         </div>
       )}
 

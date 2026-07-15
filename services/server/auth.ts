@@ -65,7 +65,6 @@ export interface ServerEmployee {
   bank_name?: string | null;
   bank_account_number?: string | null;
   hourly_rate?: number | string | null;
-  base_salary_per_hour?: number | string | null;
 }
 
 export interface AuthContext {
@@ -353,7 +352,6 @@ export function toPublicStaffEmployee(employee: ServerEmployee) {
     bank_name: employee.bank_name ?? null,
     bank_account_number: employee.bank_account_number ?? null,
     hourly_rate: employee.hourly_rate ?? null,
-    base_salary_per_hour: employee.base_salary_per_hour ?? null,
   };
 }
 

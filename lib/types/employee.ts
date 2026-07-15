@@ -12,5 +12,4 @@ export interface Employee {
     bank_name?: string | null;
     bank_account_number?: string |null;
     hourly_rate?: number | string | null;
-    base_salary_per_hour?: number | string | null;
   }

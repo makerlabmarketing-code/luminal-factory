@@ -7,7 +7,7 @@ import {
 } from '@/lib/business-date';
 import { calculateHoursFromStrings, calculateSalary } from '@/services/payrollService';
 import { getEmployeeHourlyRate, normalizeTimeValue } from '@/services/attendanceService';
-import { loadAttendanceData } from '@/services/server/attendanceData';
+import { AttendanceDataError, loadAttendanceData } from '@/services/server/attendanceData';
 import {
   AuthFlowError,
   hasPermission,
@@ -15,6 +15,7 @@ import {
 } from '@/services/server/auth';
 
 type AttendanceMutationBody = Record<string, unknown>;
+type AttendanceAction = 'load' | 'update';
 
 async function requireAttendanceView() {
   const authContext = await requireWorkspaceAccess('ADMIN_WORKSPACE');
@@ -48,13 +49,42 @@ async function requireAttendanceManage() {
   return authContext;
 }
 
-function toErrorResponse(error: unknown) {
+function toErrorResponse(error: unknown, action: AttendanceAction) {
   if (error instanceof AuthFlowError) {
-    return NextResponse.json({ error: error.message }, { status: error.status });
+    const isPermissionDenied =
+      error.code === 'permission_forbidden' || error.code === 'workspace_forbidden';
+
+    return NextResponse.json(
+      {
+        error: error.message,
+        code: isPermissionDenied ? 'attendance_permission_denied' : error.code,
+        failure_stage: error.failureStage,
+      },
+      { status: error.status }
+    );
+  }
+
+  if (error instanceof AttendanceDataError) {
+    return NextResponse.json(
+      {
+        error: error.message,
+        code: error.code,
+        failure_stage: error.failureStage,
+        supabase_error_code: error.supabaseErrorCode ?? null,
+      },
+      { status: error.code === 'attendance_configuration_failed' ? 400 : 500 }
+    );
   }
 
   return NextResponse.json(
-    { error: 'Không thể tải hoặc cập nhật dữ liệu chấm công.' },
+    {
+      error:
+        action === 'load'
+          ? 'Không thể tải dữ liệu chấm công.'
+          : 'Không thể cập nhật dữ liệu chấm công.',
+      code: action === 'load' ? 'attendance_load_failed' : 'attendance_update_failed',
+      failure_stage: action === 'load' ? 'unknown_load_failure' : 'unknown_update_failure',
+    },
     { status: 500 }
   );
 }
@@ -85,7 +115,7 @@ async function getEmployeeById(employeeId: string | number) {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('employees')
-    .select('id, full_name, title, hourly_rate, base_salary_per_hour')
+    .select('id, full_name, title, hourly_rate')
     .eq('id', employeeId)
     .maybeSingle();
 
@@ -145,7 +175,7 @@ export async function GET(request: Request) {
       },
     });
   } catch (error) {
-    return toErrorResponse(error);
+    return toErrorResponse(error, 'load');
   }
 }
 
@@ -192,7 +222,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    return toErrorResponse(error);
+    return toErrorResponse(error, 'update');
   }
 }
 
@@ -238,7 +268,7 @@ export async function PATCH(request: Request) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    return toErrorResponse(error);
+    return toErrorResponse(error, 'update');
   }
 }
 
@@ -262,6 +292,6 @@ export async function DELETE(request: Request) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    return toErrorResponse(error);
+    return toErrorResponse(error, 'update');
   }
 }

@@ -29,7 +29,7 @@ function normalizeTimeValue(value: string | null | undefined): string | null {
 }
 
 function getEmployeeHourlyRate(employee: ServerEmployee): number {
-  return Number(employee.hourly_rate || employee.base_salary_per_hour || 30000);
+  return Number(employee.hourly_rate || 30000);
 }
 
 function autoDetectShift(date: Date) {
@@ -137,7 +137,6 @@ async function loadAttendancePayload(employee: ServerEmployee, monthInput: strin
       branch: employee.branch ?? null,
       branch_code: employee.branch_code ?? null,
       hourly_rate: employee.hourly_rate ?? null,
-      base_salary_per_hour: employee.base_salary_per_hour ?? null,
     },
     localBranchName: resolveBranchName(matchedBranch),
     todayRecord: openRecord || currentShiftRecord || null,
