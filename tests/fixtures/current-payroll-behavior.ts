@@ -32,10 +32,10 @@ export const currentPayrollHoursFixtures: readonly PayrollHoursFixture[] = [
     expectedHours: 0,
   },
   {
-    name: 'one minute rounds up to one 3-hour block',
+    name: 'one minute keeps actual worked time',
     checkIn: '09:00',
     checkOut: '09:01',
-    expectedHours: 3,
+    expectedHours: 0.02,
   },
   {
     name: 'exact 3-hour block stays 3 hours',
@@ -44,10 +44,10 @@ export const currentPayrollHoursFixtures: readonly PayrollHoursFixture[] = [
     expectedHours: 3,
   },
   {
-    name: '3 hours and 1 minute rounds up to 6 hours',
+    name: '3 hours and 1 minute keeps actual worked time',
     checkIn: '09:00',
     checkOut: '12:01',
-    expectedHours: 6,
+    expectedHours: 3.02,
   },
   {
     name: '9-hour day stays 9 hours',
@@ -101,4 +101,3 @@ export const currentPayrollSalaryFixtures: readonly PayrollSalaryFixture[] = [
     expectedSalary: 0,
   },
 ];
-

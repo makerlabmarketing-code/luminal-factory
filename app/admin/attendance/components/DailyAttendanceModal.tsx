@@ -1,14 +1,17 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { X, Save, Plus, User, CheckCircle2, Trash2 } from 'lucide-react';
 import type { AttendanceRecord, Shift, ToastType } from '@/lib/types/attendance';
 import type { Employee } from "@/lib/types/employee";
 import { businessDateFromDateInput, formatBusinessDate } from '@/lib/business-date';
 import {
   deleteAttendanceRecord,
+  formatWorkedDuration,
   getEmployeeHourlyRate,
+  getWorkedMinutesForRecord,
   hasDuplicatedShift,
+  calculateShiftUnitsFromMinutes,
   updateAttendanceRecordTime,
   upsertAttendanceRecord,
 } from '@/services/attendanceService';
@@ -24,6 +27,7 @@ interface DailyAttendanceModalProps {
   onReload: () => void;
   showToast: (title: string, message: string, type: ToastType) => void;
   showConfirm: (title: string, message: string, onConfirm: () => void) => void;
+  canAdjust: boolean;
 }
 
 interface EditRow {
@@ -46,6 +50,7 @@ export default function DailyAttendanceModal({
   onReload,
   showToast,
   showConfirm,
+  canAdjust,
 }: DailyAttendanceModalProps) {
   const [editRows, setEditRows] = useState<Record<string, EditRow>>({});
   const [newShift, setNewShift] = useState('');
@@ -53,9 +58,11 @@ export default function DailyAttendanceModal({
   const [newOut, setNewOut] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const myRecords = existingRecords.filter((record) => {
+  const myRecords = useMemo(() => existingRecords.filter((record) => {
+    if (!currentEmpId) return true;
+
     return String(record.employee_id) === String(currentEmpId);
-  });
+  }), [currentEmpId, existingRecords]);
 
   const currentEmployee = employees.find((employee) => {
     return String(employee.id) === String(currentEmpId);
@@ -79,23 +86,37 @@ export default function DailyAttendanceModal({
     setNewShift(shifts[0]?.shift_name || '');
     setNewIn('');
     setNewOut('');
-  }, [isOpen, existingRecords, currentEmpId, shifts]);
+  }, [isOpen, myRecords, shifts]);
 
   if (!isOpen || !dateStr) return null;
 
   const handleUpdateRecord = async (recordId: number | string) => {
+    if (!canAdjust) {
+      showToast('Không có quyền', 'Bạn không có quyền điều chỉnh chấm công.', 'error');
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
       const rowData = editRows[getRecordKey(recordId)];
+      const targetRecord = myRecords.find((record) => String(record.id) === String(recordId));
 
-      if (!rowData) {
+      if (!rowData || !targetRecord) {
         showToast('Thiếu dữ liệu', 'Không tìm thấy dòng cần cập nhật.', 'error');
+        return;
+      }
+
+      if (String(targetRecord.id).startsWith('log-')) {
+        showToast('Chưa thể điều chỉnh', 'Dữ liệu log cũ cần được chuyển đổi trước khi sửa.', 'error');
         return;
       }
 
       await updateAttendanceRecordTime({
         recordId,
+        employeeId: targetRecord.employee_id,
+        workDate: targetRecord.work_date,
+        shiftName: targetRecord.shift_name,
         checkIn: rowData.check_in,
         checkOut: rowData.check_out,
         hourlyRate: baseHourlyRate,
@@ -112,6 +133,16 @@ export default function DailyAttendanceModal({
   };
 
   const handleDeleteRecord = (recordId: number | string, shiftName: string) => {
+    if (!canAdjust) {
+      showToast('Không có quyền', 'Bạn không có quyền điều chỉnh chấm công.', 'error');
+      return;
+    }
+
+    if (String(recordId).startsWith('log-')) {
+      showToast('Chưa thể xóa', 'Dữ liệu log cũ cần được chuyển đổi trước khi xóa.', 'error');
+      return;
+    }
+
     showConfirm('Xác nhận xóa', `Bạn có chắc chắn muốn xóa bản ghi [${shiftName}] này không?`, async () => {
       setIsSubmitting(true);
 
@@ -129,6 +160,11 @@ export default function DailyAttendanceModal({
   };
 
   const handleAddNewRecord = async () => {
+    if (!canAdjust) {
+      showToast('Không có quyền', 'Bạn không có quyền điều chỉnh chấm công.', 'error');
+      return;
+    }
+
     if (!currentEmpId || !newShift) {
       showToast('Thiếu dữ liệu', 'Vui lòng chọn nhân sự và ca làm việc.', 'error');
       return;
@@ -182,7 +218,7 @@ export default function DailyAttendanceModal({
 
   const displayDate = formatBusinessDate(businessDateFromDateInput(dateStr), { weekday: 'long' });
 
-  const currentEmpName = currentEmployee?.full_name || 'Đang tải...';
+  const currentEmpName = currentEmployee?.full_name || (currentEmpId ? 'Đang tải...' : 'Chọn một nhân sự ở bộ lọc');
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-[100] animate-fadeIn">
@@ -211,7 +247,13 @@ export default function DailyAttendanceModal({
               </div>
             ) : (
               <div className="grid grid-cols-1 gap-2.5">
-                {myRecords.map((record) => (
+                {myRecords.map((record) => {
+                  const recordEmployee = employees.find((employee) => String(employee.id) === String(record.employee_id));
+                  const workedMinutes = getWorkedMinutesForRecord(record);
+                  const shiftUnits = calculateShiftUnitsFromMinutes(workedMinutes);
+                  const isLegacyLog = String(record.id).startsWith('log-');
+
+                  return (
                   <div
                     key={record.id}
                     className="bg-[#0b0f19] border border-slate-800 p-3 rounded-lg flex flex-col md:flex-row md:items-center justify-between gap-4 transition hover:border-slate-700"
@@ -219,17 +261,25 @@ export default function DailyAttendanceModal({
                     <div className="min-w-0 flex-1">
                       <p className="text-xs font-bold text-slate-300 flex items-center gap-1.5 truncate">
                         <User className="w-3 h-3 text-slate-500 shrink-0" />
-                        <span className="truncate">{record.employee_name || currentEmpName}</span>
+                        <span className="truncate">{record.employee_name || recordEmployee?.full_name || currentEmpName}</span>
                       </p>
 
-                      <div className="flex items-center gap-2 mt-1">
+                      <div className="flex flex-wrap items-center gap-2 mt-1">
                         <p className="text-[10px] text-slate-500 font-mono">[{record.shift_name}]</p>
 
-                        {Number(record.total_hours || 0) > 0 && (
+                        {workedMinutes > 0 && (
                           <span className="text-[10px] bg-slate-800/60 text-emerald-400 px-1.5 py-0.5 rounded font-mono">
-                            {record.total_hours}h → {Number(record.total_salary || 0).toLocaleString('vi-VN')}đ
+                            {formatWorkedDuration(workedMinutes)} · {shiftUnits} ca
                           </span>
                         )}
+
+                        <span className="text-[10px] bg-slate-800/60 text-slate-400 px-1.5 py-0.5 rounded font-mono">
+                          Điều chỉnh: {record.adjustment_note ? 'Có' : 'Không'}
+                        </span>
+
+                        <span className="text-[10px] bg-slate-800/60 text-slate-400 px-1.5 py-0.5 rounded font-mono">
+                          Người điều chỉnh: {record.adjusted_by_name || 'Chưa có audit'}
+                        </span>
                       </div>
                     </div>
 
@@ -241,6 +291,7 @@ export default function DailyAttendanceModal({
                         <input
                           type="time"
                           style={{ colorScheme: 'dark' }}
+                          disabled={!canAdjust || isLegacyLog}
                           value={editRows[getRecordKey(record.id)]?.check_in || ''}
                           onChange={(event) =>
                             setEditRows((prev) => ({
@@ -251,7 +302,7 @@ export default function DailyAttendanceModal({
                               },
                             }))
                           }
-                          className="bg-[#131924] border border-slate-800 text-slate-300 rounded-md px-2 py-1.5 text-[11px] font-mono focus:border-blue-500 focus:outline-none w-24"
+                          className="bg-[#131924] border border-slate-800 text-slate-300 rounded-md px-2 py-1.5 text-[11px] font-mono focus:border-blue-500 focus:outline-none w-24 disabled:opacity-50"
                         />
                       </div>
 
@@ -262,6 +313,7 @@ export default function DailyAttendanceModal({
                         <input
                           type="time"
                           style={{ colorScheme: 'dark' }}
+                          disabled={!canAdjust || isLegacyLog}
                           value={editRows[getRecordKey(record.id)]?.check_out || ''}
                           onChange={(event) =>
                             setEditRows((prev) => ({
@@ -272,15 +324,15 @@ export default function DailyAttendanceModal({
                               },
                             }))
                           }
-                          className="bg-[#131924] border border-slate-800 text-slate-300 rounded-md px-2 py-1.5 text-[11px] font-mono focus:border-blue-500 focus:outline-none w-24"
+                          className="bg-[#131924] border border-slate-800 text-slate-300 rounded-md px-2 py-1.5 text-[11px] font-mono focus:border-blue-500 focus:outline-none w-24 disabled:opacity-50"
                         />
                       </div>
 
                       <div className="flex items-center gap-1 mt-4">
                         <button
                           onClick={() => handleUpdateRecord(record.id)}
-                          disabled={isSubmitting}
-                          className="p-1.5 text-blue-400 hover:bg-blue-500/10 rounded-md border border-transparent hover:border-blue-500/20 transition"
+                          disabled={isSubmitting || !canAdjust || isLegacyLog}
+                          className="p-1.5 text-blue-400 hover:bg-blue-500/10 rounded-md border border-transparent hover:border-blue-500/20 transition disabled:opacity-40"
                           title="Lưu cập nhật"
                         >
                           <Save className="w-3.5 h-3.5" />
@@ -288,8 +340,8 @@ export default function DailyAttendanceModal({
 
                         <button
                           onClick={() => handleDeleteRecord(record.id, record.shift_name)}
-                          disabled={isSubmitting}
-                          className="p-1.5 text-red-400 hover:bg-red-500/10 rounded-md border border-transparent hover:border-red-500/20 transition"
+                          disabled={isSubmitting || !canAdjust || isLegacyLog}
+                          className="p-1.5 text-red-400 hover:bg-red-500/10 rounded-md border border-transparent hover:border-red-500/20 transition disabled:opacity-40"
                           title="Xóa ca này"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -297,7 +349,8 @@ export default function DailyAttendanceModal({
                       </div>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -327,6 +380,7 @@ export default function DailyAttendanceModal({
                 <select
                   className="w-full bg-[#131924] border border-slate-800 px-2 py-1.5 rounded-md text-[11px] text-slate-300 focus:border-blue-500 focus:outline-none"
                   value={newShift}
+                  disabled={!canAdjust || !currentEmployee}
                   onChange={(event) => setNewShift(event.target.value)}
                 >
                   {shifts.map((shift) => (
@@ -345,8 +399,9 @@ export default function DailyAttendanceModal({
                   type="time"
                   style={{ colorScheme: 'dark' }}
                   value={newIn}
+                  disabled={!canAdjust || !currentEmployee}
                   onChange={(event) => setNewIn(event.target.value)}
-                  className="w-full bg-[#131924] border border-slate-800 text-slate-300 rounded-md px-2 py-1.5 text-[11px] font-mono focus:border-blue-500 focus:outline-none"
+                  className="w-full bg-[#131924] border border-slate-800 text-slate-300 rounded-md px-2 py-1.5 text-[11px] font-mono focus:border-blue-500 focus:outline-none disabled:opacity-50"
                 />
               </div>
 
@@ -358,8 +413,9 @@ export default function DailyAttendanceModal({
                   type="time"
                   style={{ colorScheme: 'dark' }}
                   value={newOut}
+                  disabled={!canAdjust || !currentEmployee}
                   onChange={(event) => setNewOut(event.target.value)}
-                  className="w-full bg-[#131924] border border-slate-800 text-slate-300 rounded-md px-2 py-1.5 text-[11px] font-mono focus:border-blue-500 focus:outline-none"
+                  className="w-full bg-[#131924] border border-slate-800 text-slate-300 rounded-md px-2 py-1.5 text-[11px] font-mono focus:border-blue-500 focus:outline-none disabled:opacity-50"
                 />
               </div>
             </div>
@@ -367,8 +423,8 @@ export default function DailyAttendanceModal({
             <div className="pt-2">
               <button
                 onClick={handleAddNewRecord}
-                disabled={isSubmitting}
-                className="w-full bg-[#131924] hover:bg-slate-800 border border-slate-700 hover:border-slate-500 text-slate-300 font-medium py-2 rounded-md transition text-[11px] flex justify-center items-center gap-1.5"
+                disabled={isSubmitting || !canAdjust || !currentEmployee}
+                className="w-full bg-[#131924] hover:bg-slate-800 border border-slate-700 hover:border-slate-500 text-slate-300 font-medium py-2 rounded-md transition text-[11px] flex justify-center items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <CheckCircle2 className="w-3.5 h-3.5" /> Lưu bản ghi bổ sung
               </button>

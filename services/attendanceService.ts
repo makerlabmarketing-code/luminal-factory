@@ -1,6 +1,13 @@
-import { calculateHoursFromStrings, calculateSalary } from '@/services/payrollService';
+import {
+  calculateActualHoursFromMinutes,
+  calculateHoursFromStrings,
+  calculateSalary,
+  calculateWorkedMinutesFromStrings,
+} from './payrollService';
 import type { AttendanceRecord, Shift } from '@/lib/types/attendance';
 import type { Employee } from '@/lib/types/employee';
+
+const SHIFT_MINUTES = 180;
 
 async function createBrowserDataClient() {
   const { createClient } = await import('@/utils/supabase/client');
@@ -17,8 +24,92 @@ export function normalizeTimeValue(value: string | null | undefined): string | n
 }
 
 export function calculateShiftUnitsFromHours(hours: number): number {
-  if (hours <= 0) return 0;
-  return Math.ceil(hours / 3);
+  if (!Number.isFinite(hours) || hours <= 0) return 0;
+
+  return calculateShiftUnitsFromMinutes(Math.round(hours * 60));
+}
+
+export function calculateShiftUnitsFromMinutes(workedMinutes: number): number {
+  if (!Number.isFinite(workedMinutes) || workedMinutes <= 0) return 0;
+
+  return Math.ceil(workedMinutes / SHIFT_MINUTES);
+}
+
+function normalizeHoursValue(value: number | string | null | undefined): number | null {
+  if (value === null || value === undefined || value === '') return null;
+
+  const numericValue = Number(value);
+  return Number.isFinite(numericValue) && numericValue >= 0 ? numericValue : null;
+}
+
+function toComparableTime(value: string | null | undefined): string | null {
+  if (!value) return null;
+
+  return normalizeTimeValue(value)?.slice(0, 8) || null;
+}
+
+function earlierTime(first: string | null | undefined, second: string | null | undefined) {
+  const normalizedFirst = toComparableTime(first);
+  const normalizedSecond = toComparableTime(second);
+
+  if (!normalizedFirst) return normalizedSecond;
+  if (!normalizedSecond) return normalizedFirst;
+
+  return normalizedFirst <= normalizedSecond ? normalizedFirst : normalizedSecond;
+}
+
+function laterTime(first: string | null | undefined, second: string | null | undefined) {
+  const normalizedFirst = toComparableTime(first);
+  const normalizedSecond = toComparableTime(second);
+
+  if (!normalizedFirst) return normalizedSecond;
+  if (!normalizedSecond) return normalizedFirst;
+
+  return normalizedFirst >= normalizedSecond ? normalizedFirst : normalizedSecond;
+}
+
+export function getWorkedMinutesForRecord(record: AttendanceRecord, now = new Date()): number {
+  const storedHours = normalizeHoursValue(record.total_hours);
+  if (storedHours !== null && record.check_out) {
+    return Math.round(storedHours * 60);
+  }
+
+  if (record.check_in && record.check_out) {
+    return calculateWorkedMinutesFromStrings(record.check_in, record.check_out);
+  }
+
+  if (record.check_in && !record.check_out) {
+    const recordStart = new Date(`${record.work_date}T${record.check_in.slice(0, 8)}`);
+    if (!Number.isFinite(recordStart.getTime()) || now.getTime() <= recordStart.getTime()) {
+      return 0;
+    }
+
+    return Math.floor((now.getTime() - recordStart.getTime()) / 60000);
+  }
+
+  return 0;
+}
+
+export function enrichAttendanceRecord(record: AttendanceRecord, now = new Date()): AttendanceRecord {
+  const workedMinutes = getWorkedMinutesForRecord(record, now);
+
+  return {
+    ...record,
+    total_worked_minutes: workedMinutes,
+    calculated_shifts: calculateShiftUnitsFromMinutes(workedMinutes),
+  };
+}
+
+export function formatWorkedDuration(workedMinutes: number | null | undefined): string {
+  if (!workedMinutes || workedMinutes <= 0) return '0 phút';
+
+  const hours = Math.floor(workedMinutes / 60);
+  const minutes = workedMinutes % 60;
+
+  if (hours <= 0) return `${minutes} phút`;
+  if (minutes <= 0) return `${hours} giờ`;
+
+  return `${hours} giờ ${minutes} phút`;
 }
 
 function throwAttendanceError(error: unknown): never {
@@ -43,13 +134,17 @@ export function mergeAttendanceRecords(records: AttendanceRecord[]): AttendanceR
       return;
     }
 
-    const prefersCurrentId = record.check_out && !existing.check_out;
-    const mergedCheckIn = existing.check_in || record.check_in || null;
-    const mergedCheckOut = existing.check_out || record.check_out || null;
+    const prefersCurrentId = Boolean(record.check_out && !existing.check_out);
+    const mergedCheckIn = earlierTime(existing.check_in, record.check_in);
+    const mergedCheckOut = laterTime(existing.check_out, record.check_out);
+    const calculatedTotalHours =
+      mergedCheckIn && mergedCheckOut
+        ? calculateActualHoursFromMinutes(calculateWorkedMinutesFromStrings(mergedCheckIn, mergedCheckOut))
+        : null;
     const mergedTotalHours =
-      existing.total_hours ?? record.total_hours ?? (mergedCheckIn && mergedCheckOut
-        ? calculateHoursFromStrings(mergedCheckIn, mergedCheckOut)
-        : null);
+      normalizeHoursValue(existing.total_hours) ??
+      normalizeHoursValue(record.total_hours) ??
+      calculatedTotalHours;
     const mergedTotalSalary = existing.total_salary ?? record.total_salary ?? null;
 
     mergedMap.set(key, {
@@ -61,10 +156,22 @@ export function mergeAttendanceRecords(records: AttendanceRecord[]): AttendanceR
       total_hours: mergedTotalHours,
       total_salary: mergedTotalSalary,
       status: existing.status || record.status || null,
+      total_worked_minutes: getWorkedMinutesForRecord({
+        ...existing,
+        check_in: mergedCheckIn,
+        check_out: mergedCheckOut,
+        total_hours: mergedTotalHours,
+      }),
+      calculated_shifts: calculateShiftUnitsFromMinutes(getWorkedMinutesForRecord({
+        ...existing,
+        check_in: mergedCheckIn,
+        check_out: mergedCheckOut,
+        total_hours: mergedTotalHours,
+      })),
     });
   });
 
-  return Array.from(mergedMap.values());
+  return Array.from(mergedMap.values()).map((record) => enrichAttendanceRecord(record));
 }
 
 export function isAttendanceRecordComplete(record: AttendanceRecord): boolean {
@@ -198,28 +305,30 @@ export async function checkOutAttendance(params: {
 
 export async function updateAttendanceRecordTime(params: {
   recordId: number | string;
+  employeeId: number | string;
+  workDate: string;
+  shiftName: string;
   checkIn: string;
   checkOut: string;
   hourlyRate: number;
 }): Promise<void> {
-  const supabase = await createBrowserDataClient();
-  const timeIn = normalizeTimeValue(params.checkIn);
-  const timeOut = normalizeTimeValue(params.checkOut);
-  const totalHours = calculateHoursFromStrings(timeIn, timeOut);
-  const totalSalary = calculateSalary(totalHours, params.hourlyRate);
+  const response = await fetch('/api/admin/attendance', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      recordId: params.recordId,
+      employeeId: params.employeeId,
+      workDate: params.workDate,
+      shiftName: params.shiftName,
+      checkIn: params.checkIn,
+      checkOut: params.checkOut,
+    }),
+  });
 
-  const { error } = await supabase
-    .from('attendance')
-    .update({
-      check_in: timeIn,
-      check_out: timeOut,
-      total_hours: totalHours,
-      total_salary: totalSalary,
-      status: 'PRESENT',
-    })
-    .eq('id', params.recordId);
-
-  if (error) throwAttendanceError(error);
+  if (!response.ok) {
+    const result = (await response.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(result?.error || 'Không thể cập nhật giờ công.');
+  }
 }
 
 export async function upsertAttendanceRecord(params: {
@@ -230,54 +339,33 @@ export async function upsertAttendanceRecord(params: {
   checkOut: string;
   hourlyRate: number;
 }): Promise<void> {
-  const supabase = await createBrowserDataClient();
-  const timeIn = normalizeTimeValue(params.checkIn);
-  const timeOut = normalizeTimeValue(params.checkOut);
-  const totalHours = calculateHoursFromStrings(timeIn, timeOut);
-  const totalSalary = calculateSalary(totalHours, params.hourlyRate);
-
-  const existingRecord = await getAttendanceRecordByShift({
-    employeeId: params.employee.id,
-    workDate: params.workDate,
-    shiftName: params.shiftName,
+  const response = await fetch('/api/admin/attendance', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      employeeId: params.employee.id,
+      workDate: params.workDate,
+      shiftName: params.shiftName,
+      checkIn: params.checkIn,
+      checkOut: params.checkOut,
+    }),
   });
 
-  if (existingRecord) {
-    const { error } = await supabase
-      .from('attendance')
-      .update({
-        check_in: timeIn,
-        check_out: timeOut,
-        total_hours: totalHours,
-        total_salary: totalSalary,
-        status: 'PRESENT',
-      })
-      .eq('id', existingRecord.id);
-
-    if (error) throwAttendanceError(error);
-    return;
+  if (!response.ok) {
+    const result = (await response.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(result?.error || 'Không thể bổ sung ca làm việc.');
   }
-
-  const { error } = await supabase.from('attendance').insert([
-    {
-      employee_id: params.employee.id,
-      work_date: params.workDate,
-      shift_name: params.shiftName,
-      check_in: timeIn,
-      check_out: timeOut,
-      total_hours: totalHours,
-      total_salary: totalSalary,
-      status: 'PRESENT',
-    },
-  ]);
-
-  if (error) throwAttendanceError(error);
 }
 
 export async function deleteAttendanceRecord(recordId: number | string): Promise<void> {
-  const supabase = await createBrowserDataClient();
-  const { error } = await supabase.from('attendance').delete().eq('id', recordId);
-  if (error) throwAttendanceError(error);
+  const response = await fetch(`/api/admin/attendance?recordId=${encodeURIComponent(String(recordId))}`, {
+    method: 'DELETE',
+  });
+
+  if (!response.ok) {
+    const result = (await response.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(result?.error || 'Không thể xóa bản ghi.');
+  }
 }
 
 export function hasDuplicatedShift(params: {

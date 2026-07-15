@@ -12,6 +12,7 @@ import {
 import type { AttendanceRecord } from '@/lib/types/attendance';
 import type { Facility } from '@/lib/types/facility';
 import { calculateHoursFromStrings, calculateSalary } from '@/services/payrollService';
+import { loadAttendanceData } from '@/services/server/attendanceData';
 import {
   AuthFlowError,
   requireWorkspaceAccess,
@@ -19,7 +20,7 @@ import {
 } from '@/services/server/auth';
 
 const ATTENDANCE_SELECT =
-  'id, employee_id, employee_name, work_date, shift_name, check_in, check_out, total_hours, total_salary, status';
+  'id, employee_id, work_date, shift_name, check_in, check_out, total_hours, total_salary, status';
 const FACILITY_SELECT = 'id, name, facility_name, code, lat, lng, radius';
 
 function normalizeTimeValue(value: string | null | undefined): string | null {
@@ -38,43 +39,6 @@ function autoDetectShift(date: Date) {
   if (hour >= 12 && hour < 18) return 'Ca Chiều';
 
   return 'Ca Tối';
-}
-
-function mergeAttendanceRecords(records: AttendanceRecord[]): AttendanceRecord[] {
-  const mergedMap = new Map<string, AttendanceRecord>();
-
-  records.forEach((record) => {
-    const key = `${record.employee_id}-${record.work_date}-${record.shift_name}`;
-    const existing = mergedMap.get(key);
-
-    if (!existing) {
-      mergedMap.set(key, { ...record });
-      return;
-    }
-
-    const prefersCurrentId = record.check_out && !existing.check_out;
-    const mergedCheckIn = existing.check_in || record.check_in || null;
-    const mergedCheckOut = existing.check_out || record.check_out || null;
-    const mergedTotalHours =
-      existing.total_hours ??
-      record.total_hours ??
-      (mergedCheckIn && mergedCheckOut
-        ? calculateHoursFromStrings(mergedCheckIn, mergedCheckOut)
-        : null);
-
-    mergedMap.set(key, {
-      ...existing,
-      id: prefersCurrentId ? record.id : existing.id,
-      employee_name: existing.employee_name || record.employee_name || null,
-      check_in: mergedCheckIn,
-      check_out: mergedCheckOut,
-      total_hours: mergedTotalHours,
-      total_salary: existing.total_salary ?? record.total_salary ?? null,
-      status: existing.status || record.status || null,
-    });
-  });
-
-  return Array.from(mergedMap.values());
 }
 
 function findMatchedBranch(employee: ServerEmployee, branches: Facility[]): Facility | null {
@@ -145,7 +109,6 @@ async function getAttendanceRecordByShift(
 }
 
 async function loadAttendancePayload(employee: ServerEmployee, monthInput: string) {
-  const supabase = await createClient();
   const month = businessMonthFromDateInput(monthInput);
   const monthRange = businessMonthRange(month);
   const startDate = formatBusinessDateInput(monthRange.localStart);
@@ -153,24 +116,17 @@ async function loadAttendancePayload(employee: ServerEmployee, monthInput: strin
   const todayStr = formatBusinessDateInput(businessDateFromInstant(new Date()));
   const currentShift = autoDetectShift(new Date());
 
-  const { data, error } = await supabase
-    .from('attendance')
-    .select(ATTENDANCE_SELECT)
-    .eq('employee_id', employee.id)
-    .gte('work_date', startDate)
-    .lt('work_date', endDate)
-    .order('work_date', { ascending: false })
-    .order('id', { ascending: false });
-
-  if (error) throw error;
-
   const openRecord = await getOpenAttendanceRecord(employee.id, todayStr);
   const currentShiftRecord = openRecord
     ? null
     : await getAttendanceRecordByShift(employee.id, todayStr, currentShift);
   const branches = await loadFacilities();
   const matchedBranch = findMatchedBranch(employee, branches);
-  const attendanceHistory = mergeAttendanceRecords((data || []) as AttendanceRecord[]);
+  const attendancePayload = await loadAttendanceData({
+    monthInput,
+    employeeId: employee.id,
+    includeDirectory: false,
+  });
 
   return {
     employee: {
@@ -186,7 +142,8 @@ async function loadAttendancePayload(employee: ServerEmployee, monthInput: strin
     localBranchName: resolveBranchName(matchedBranch),
     todayRecord: openRecord || currentShiftRecord || null,
     isInShift: Boolean(openRecord),
-    attendanceHistory,
+    attendanceHistory: attendancePayload.attendanceRecords,
+    sourceCounts: attendancePayload.sourceCounts,
   };
 }
 

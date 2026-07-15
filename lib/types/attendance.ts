@@ -16,6 +16,12 @@ export interface AttendanceRecord {
     total_hours?: number | string | null;
     total_salary?: number | string | null;
     status?: string | null;
+    total_worked_minutes?: number | null;
+    calculated_shifts?: number | null;
+    adjustment_note?: string | null;
+    adjusted_by_employee_id?: number | string | null;
+    adjusted_by_name?: string | null;
+    source?: 'attendance' | 'attendance_logs';
   }
   
   export type ToastType = 'success' | 'error' | 'info';

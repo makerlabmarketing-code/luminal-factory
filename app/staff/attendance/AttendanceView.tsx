@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNotification } from '@/component/NotificationContext';
 import MonthPicker from '@/component/MonthPicker';
 import { Power, RefreshCcw, AlertTriangle, CheckCircle2, Building2 } from 'lucide-react';
-import { calculateHoursFromStrings } from '@/services/payrollService';
 import {
   businessDateFromDateInput,
   businessMonthFromInstant,
@@ -14,6 +13,11 @@ import {
 import type { AttendanceRecord } from '@/lib/types/attendance';
 import type { Employee } from '@/lib/types/employee';
 import type { Facility as FacilityType } from '@/lib/types/facility';
+import {
+  calculateShiftUnitsFromMinutes,
+  formatWorkedDuration,
+  getWorkedMinutesForRecord,
+} from '@/services/attendanceService';
 
 interface AttendanceViewProps {
   workerData?: Employee | null;
@@ -65,6 +69,7 @@ export function StaffAttendanceContent({
   });
   const [historyPage, setHistoryPage] = useState(1);
   const [fetching, setFetching] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   const applyAttendancePayload = (payload: StaffAttendancePayload) => {
     setWorker(payload.employee);
@@ -78,6 +83,7 @@ export function StaffAttendanceContent({
   const loadAttendanceData = useCallback(async (monthValue = historyMonthInput) => {
     try {
       setFetching(true);
+      setFetchError(null);
       const response = await fetch(`/api/staff/attendance?month=${encodeURIComponent(monthValue)}`, {
         cache: 'no-store',
       });
@@ -90,6 +96,7 @@ export function StaffAttendanceContent({
       applyAttendancePayload((await response.json()) as StaffAttendancePayload);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Không thể tải dữ liệu chấm công.';
+      setFetchError(message);
       showToast('Lỗi kết nối', message, 'error');
     } finally {
       setFetching(false);
@@ -176,15 +183,28 @@ export function StaffAttendanceContent({
     );
   }
 
+  if (fetchError) {
+    return (
+      <div className="flex flex-col items-center justify-center p-10 bg-slate-900 border border-red-500/30 rounded-3xl space-y-3 shadow-xl max-w-md mx-auto mt-6 text-center text-xs text-red-100 w-full animate-fadeIn">
+        <AlertTriangle className="w-8 h-8 text-red-400" />
+        <p className="font-bold text-red-300">Không thể tải dữ liệu chấm công</p>
+        <p className="text-[11px] text-red-100/80">{fetchError}</p>
+      </div>
+    );
+  }
+
   const completedAttendanceRecords = attendanceHistory.filter(isAttendanceRecordComplete);
   const missingCheckoutRecords = attendanceHistory.filter(isMissingCheckoutRecord);
   const totalMonthlyHours = completedAttendanceRecords.reduce((total, record) => {
-    const hours = record.total_hours
-      ? Number(record.total_hours)
-      : calculateHoursFromStrings(record.check_in || null, record.check_out || null);
+    const hours = getWorkedMinutesForRecord(record) / 60;
 
     return total + hours;
   }, 0);
+  const totalMonthlyShifts = completedAttendanceRecords.reduce((total, record) => {
+    return total + calculateShiftUnitsFromMinutes(getWorkedMinutesForRecord(record));
+  }, 0);
+  const todayWorkedMinutes = todayRecord ? getWorkedMinutesForRecord(todayRecord, liveTime) : 0;
+  const todayShiftUnits = calculateShiftUnitsFromMinutes(todayWorkedMinutes);
   const historyTotalPages = Math.max(1, Math.ceil(attendanceHistory.length / HISTORY_ITEMS_PER_PAGE));
   const safeHistoryPage = Math.min(historyPage, historyTotalPages);
   const paginatedAttendanceHistory = attendanceHistory.slice(
@@ -222,10 +242,8 @@ export function StaffAttendanceContent({
           <CheckCircle2 className="w-6 h-6 text-emerald-400" />
           <p className="text-xs font-bold text-emerald-400">Ca làm việc đã hoàn thành!</p>
           <div className="flex flex-col sm:flex-row justify-between gap-1 w-full text-[11px] font-mono border-t border-emerald-900/30 pt-2 mt-2">
-            <span className="text-slate-400">Thời gian: {todayRecord.total_hours || 0} giờ</span>
-            <span className="text-emerald-300 font-bold">
-              Lương: {Number(todayRecord.total_salary || 0).toLocaleString('vi-VN')} đ
-            </span>
+            <span className="text-slate-400">Thời gian: {formatWorkedDuration(todayWorkedMinutes)}</span>
+            <span className="text-emerald-300 font-bold">Ca quy đổi: {todayShiftUnits} ca</span>
           </div>
         </div>
       )}
@@ -245,6 +263,17 @@ export function StaffAttendanceContent({
       <span className="text-[9px] text-purple-400 font-mono text-center bg-slate-950 p-2 rounded-lg border border-slate-800 w-full">
         Hệ thống nhận diện ca: {autoDetectShift(liveTime)}
       </span>
+
+      <div className="grid grid-cols-2 gap-3 w-full">
+        <div className="rounded-2xl border border-slate-800 bg-slate-950 p-3">
+          <p className="text-[10px] text-slate-500 font-bold uppercase">Hôm nay</p>
+          <p className="mt-1 text-sm font-black text-amber-400 font-mono">{formatWorkedDuration(todayWorkedMinutes)}</p>
+        </div>
+        <div className="rounded-2xl border border-slate-800 bg-slate-950 p-3">
+          <p className="text-[10px] text-slate-500 font-bold uppercase">Ca tạm tính</p>
+          <p className="mt-1 text-sm font-black text-purple-400 font-mono">{todayShiftUnits} ca</p>
+        </div>
+      </div>
 
       <div className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-4 space-y-4">
         <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-center">
@@ -266,7 +295,7 @@ export function StaffAttendanceContent({
             />
             <div className="rounded-xl border border-emerald-500/20 bg-emerald-950/20 px-3 py-2 text-left sm:text-right font-mono">
               <p className="text-lg font-black text-emerald-400">{Number(totalMonthlyHours.toFixed(2))}h</p>
-              <p className="text-[9px] text-slate-500">tổng giờ</p>
+              <p className="text-[9px] text-slate-500">tổng giờ · {totalMonthlyShifts} ca</p>
             </div>
           </div>
         </div>
@@ -285,9 +314,9 @@ export function StaffAttendanceContent({
           ) : (
             paginatedAttendanceHistory.map((record) => {
               const isComplete = isAttendanceRecordComplete(record);
-              const displayHours = record.total_hours
-                ? Number(record.total_hours)
-                : calculateHoursFromStrings(record.check_in || null, record.check_out || null);
+              const workedMinutes = getWorkedMinutesForRecord(record);
+              const displayHours = Number((workedMinutes / 60).toFixed(2));
+              const shiftUnits = calculateShiftUnitsFromMinutes(workedMinutes);
               const displayDate = formatBusinessDate(businessDateFromDateInput(record.work_date));
 
               return (
@@ -302,7 +331,7 @@ export function StaffAttendanceContent({
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-2 text-[10px] font-mono">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[10px] font-mono">
                     <div className="rounded-lg border border-slate-800 bg-slate-950/60 p-2">
                       <p className="text-slate-500 uppercase font-bold">Vào</p>
                       <p className="mt-1 text-emerald-400 font-black">{record.check_in ? record.check_in.slice(0, 5) : '--:--'}</p>
@@ -315,6 +344,10 @@ export function StaffAttendanceContent({
                       <p className="text-slate-500 uppercase font-bold">Giờ</p>
                       <p className="mt-1 text-amber-400 font-black">{isComplete ? displayHours : '-'}</p>
                     </div>
+                    <div className="rounded-lg border border-slate-800 bg-slate-950/60 p-2">
+                      <p className="text-slate-500 uppercase font-bold">Ca</p>
+                      <p className="mt-1 text-purple-400 font-black">{shiftUnits}</p>
+                    </div>
                   </div>
                 </div>
               );
@@ -323,7 +356,7 @@ export function StaffAttendanceContent({
         </div>
 
         <div className="hidden md:block overflow-x-auto rounded-xl border border-slate-800">
-          <table className="w-full min-w-[560px] text-left text-[11px]">
+          <table className="w-full min-w-[640px] text-left text-[11px]">
             <thead className="bg-slate-900/80 text-slate-500 uppercase tracking-wider">
               <tr>
                 <th className="px-3 py-2 font-black">Ngày</th>
@@ -331,22 +364,23 @@ export function StaffAttendanceContent({
                 <th className="px-3 py-2 font-black text-center">Vào</th>
                 <th className="px-3 py-2 font-black text-center">Ra</th>
                 <th className="px-3 py-2 font-black text-right">Giờ</th>
+                <th className="px-3 py-2 font-black text-right">Ca</th>
                 <th className="px-3 py-2 font-black text-center">Trạng thái</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/80 bg-slate-950/40">
               {attendanceHistory.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-3 py-6 text-center text-slate-500 italic">
+                  <td colSpan={7} className="px-3 py-6 text-center text-slate-500 italic">
                     Chưa có dữ liệu chấm công trong tháng này.
                   </td>
                 </tr>
               ) : (
                 paginatedAttendanceHistory.map((record) => {
                   const isComplete = isAttendanceRecordComplete(record);
-                  const displayHours = record.total_hours
-                    ? Number(record.total_hours)
-                    : calculateHoursFromStrings(record.check_in || null, record.check_out || null);
+                  const workedMinutes = getWorkedMinutesForRecord(record);
+                  const displayHours = Number((workedMinutes / 60).toFixed(2));
+                  const shiftUnits = calculateShiftUnitsFromMinutes(workedMinutes);
                   const displayDate = formatBusinessDate(businessDateFromDateInput(record.work_date));
 
                   return (
@@ -356,6 +390,7 @@ export function StaffAttendanceContent({
                       <td className="px-3 py-2.5 text-center font-mono text-emerald-400">{record.check_in ? record.check_in.slice(0, 5) : '--:--'}</td>
                       <td className="px-3 py-2.5 text-center font-mono text-red-400">{record.check_out ? record.check_out.slice(0, 5) : '--:--'}</td>
                       <td className="px-3 py-2.5 text-right font-mono text-amber-400 font-bold">{isComplete ? displayHours : '-'}</td>
+                      <td className="px-3 py-2.5 text-right font-mono text-purple-400 font-bold">{shiftUnits}</td>
                       <td className="px-3 py-2.5 text-center">
                         <span className={isComplete ? 'inline-flex rounded-md border border-emerald-500/20 bg-emerald-950/30 px-2 py-1 text-[10px] font-bold text-emerald-400' : 'inline-flex rounded-md border border-amber-500/20 bg-amber-950/30 px-2 py-1 text-[10px] font-bold text-amber-400'}>
                           {isComplete ? 'Đã ghi nhận' : 'Cần bổ sung'}
