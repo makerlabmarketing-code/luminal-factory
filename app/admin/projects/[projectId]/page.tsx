@@ -70,9 +70,9 @@ function formatDateTime(value?: string | null): string {
 }
 
 function formatDate(value?: string | null): string {
-  if (!value) return 'Chưa có hạn';
+  if (!value) return 'Chưa đặt deadline';
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
+  if (Number.isNaN(date.getTime())) return 'Chưa đặt deadline';
 
   return date.toLocaleDateString('vi-VN');
 }
@@ -163,11 +163,15 @@ function mapLegacyTasksToPhaseGroups(
 }
 
 function getTaskAssigneeLabel(task: WorkflowTask): string {
-  return task.assignedEmployee?.fullName || task.assignedToText || 'Chưa gán';
+  return task.assignedEmployee?.fullName || task.assignedToText || 'Chưa phân công';
 }
 
 function getTaskPackerLabel(task: WorkflowTask): string | null {
   return task.packerEmployee?.fullName || task.packerAssignedText || null;
+}
+
+function getTaskDeadlineLabel(task: WorkflowTask): string {
+  return formatDate(task.estimationDate || task.deadline);
 }
 
 function isTaskCompleted(task: WorkflowTask): boolean {
@@ -581,7 +585,7 @@ export default function ProjectDetailPage() {
                       <thead className="text-slate-500">
                         <tr className="border-b border-slate-800">
                           <th className="py-2 pr-3">Tên công việc</th>
-                          <th className="py-2 pr-3">Người thực hiện</th>
+                          <th className="py-2 pr-3">Người phụ trách</th>
                           <th className="py-2 pr-3">Người đóng gói</th>
                           <th className="py-2 pr-3">Deadline</th>
                           <th className="py-2 pr-3">Trạng thái</th>
@@ -596,7 +600,7 @@ export default function ProjectDetailPage() {
                             <td className="py-3 pr-3 font-bold text-slate-100">{task.name || task.projectName || 'Công việc chưa đặt tên'}</td>
                             <td className="py-3 pr-3">{getTaskAssigneeLabel(task)}</td>
                             <td className="py-3 pr-3">{getTaskPackerLabel(task) || 'Chưa gán'}</td>
-                            <td className="py-3 pr-3">{formatDate(task.estimationDate || task.deadline)}</td>
+                            <td className="py-3 pr-3">{getTaskDeadlineLabel(task)}</td>
                             <td className="py-3 pr-3">{taskStatusLabel(task.status || task.currentPhaseText)}</td>
                             <td className="py-3 pr-3">{task.issueNote || task.note || 'Chưa có ghi chú'}</td>
                             <td className="py-3 pr-3">Chưa có</td>
@@ -610,9 +614,9 @@ export default function ProjectDetailPage() {
                         <div key={task.id || `${task.name}-${task.deadline}`} className="rounded-lg border border-slate-800 bg-slate-950 p-3 text-xs">
                           <p className="font-bold text-slate-100">{task.name || task.projectName || 'Công việc chưa đặt tên'}</p>
                           <div className="mt-2 space-y-1 text-slate-400">
-                            <p>Người thực hiện: {getTaskAssigneeLabel(task)}</p>
+                            <p>Người phụ trách: {getTaskAssigneeLabel(task)}</p>
                             <p>Người đóng gói: {getTaskPackerLabel(task) || 'Chưa gán'}</p>
-                            <p>Deadline: {formatDate(task.estimationDate || task.deadline)}</p>
+                            <p>Deadline: {getTaskDeadlineLabel(task)}</p>
                             <p>Trạng thái: {taskStatusLabel(task.status || task.currentPhaseText)}</p>
                             <p>Ghi chú: {task.issueNote || task.note || 'Chưa có ghi chú'}</p>
                           </div>
@@ -641,12 +645,12 @@ export default function ProjectDetailPage() {
                         <p className="mt-1 inline-flex items-center gap-1 text-slate-500"><MessageSquare className="h-3 w-3" /> {task.issueNote || task.note || 'Chưa có ghi chú'}</p>
                       </div>
                       <div className="text-slate-300">
-                        <p>Người thực hiện: {getTaskAssigneeLabel(task)}</p>
+                        <p>Người phụ trách: {getTaskAssigneeLabel(task)}</p>
                         <p>Người đóng gói: {getTaskPackerLabel(task) || 'Chưa gán'}</p>
                       </div>
                       <div className="text-slate-400">
                         <p>Phase: {task.currentPhaseText || 'Chưa có'}</p>
-                        <p>Deadline: {formatDate(task.estimationDate || task.deadline)}</p>
+                        <p>Deadline: {getTaskDeadlineLabel(task)}</p>
                       </div>
                     </div>
                   ))}

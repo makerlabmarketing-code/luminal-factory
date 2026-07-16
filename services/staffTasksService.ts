@@ -160,7 +160,7 @@ export async function updateStaffWorkflowTask(params: {
     ...parsed.tasks_list[params.taskIndex],
     status: params.bufferedTask.status,
     deadline: params.bufferedTask.deadline,
-    note: params.bufferedTask.note,
+    note: params.bufferedTask.note.trim(),
   };
 
   const updatedDescription = JSON.stringify(parsed);
@@ -174,7 +174,7 @@ export async function updateStaffWorkflowTask(params: {
     taskId,
     status: params.bufferedTask.status,
     deadline: params.bufferedTask.deadline,
-    note: params.bufferedTask.note,
+    note: params.bufferedTask.note.trim(),
   });
 
   return updatedDescription;

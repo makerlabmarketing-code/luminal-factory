@@ -11,3 +11,13 @@ export interface FinancialLedgerEntry {
   created_at?: string | null;
   updated_at?: string | null;
 }
+
+export type ExpensePaymentSourceKind = 'COMMON_FUND' | 'SHAREHOLDER';
+
+export interface ExpensePaymentSourceOption {
+  id: string;
+  label: string;
+  kind: ExpensePaymentSourceKind;
+  reporterName: string | null;
+  isActive: boolean;
+}

@@ -53,6 +53,7 @@ export function StaffTasksContent({
   const [selectedProjectName, setSelectedProjectName] = useState<string | null>(null);
   const [localDriveInputs, setLocalDriveInputs] = useState<Record<string, string>>({});
   const [editableTasks, setEditableTasks] = useState<Record<string, EditableWorkflowTask>>({});
+  const [savingTaskKey, setSavingTaskKey] = useState<string | null>(null);
 
   const loadTasksData = useCallback(async () => {
     if (!workerData) {
@@ -115,16 +116,26 @@ export function StaffTasksContent({
   };
 
   const handleSaveSpecificTask = async (item: WorkflowSetting, taskIdx: number) => {
+    const targetKey = `${item.key}_TASK_${taskIdx}`;
+    if (savingTaskKey === targetKey) return;
+
     try {
-      const targetKey = `${item.key}_TASK_${taskIdx}`;
       const bufferedData = editableTasks[targetKey];
 
       if (!bufferedData) return;
+      if (!bufferedData.note.trim()) {
+        showToast('Thiếu bình luận', 'Vui lòng nhập nội dung bình luận.', 'error');
+        return;
+      }
 
+      setSavingTaskKey(targetKey);
       const updatedDescription = await updateStaffWorkflowTask({
         item,
         taskIndex: taskIdx,
-        bufferedTask: bufferedData,
+        bufferedTask: {
+          ...bufferedData,
+          note: bufferedData.note.trim(),
+        },
       });
 
       setAllWorkflowTasks((prev) =>
@@ -137,11 +148,20 @@ export function StaffTasksContent({
             : task
         )
       );
+      setEditableTasks((prev) => ({
+        ...prev,
+        [targetKey]: {
+          ...prev[targetKey],
+          note: '',
+        },
+      }));
 
       showToast('Đồng bộ thành công', '✓ Đã cập nhật tiến độ việc con trực tiếp lên hệ thống!', 'success');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Không thể cập nhật đầu việc.';
       showToast('Thất bại', message, 'error');
+    } finally {
+      setSavingTaskKey(null);
     }
   };
 
@@ -403,6 +423,7 @@ export function StaffTasksContent({
                             deadline: task.deadline || '',
                             note: task.note || '',
                           };
+                          const isSavingThisTask = savingTaskKey === targetKey;
 
                           const isAssignedToMe =
                             (workerId !== null &&
@@ -489,10 +510,10 @@ export function StaffTasksContent({
                                     Tiến độ báo cáo sếp:
                                   </label>
 
-                                  <input
-                                    type="text"
-                                    disabled={!isAssignedToMe}
-                                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1.5 text-[10px] text-slate-200 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                                  <textarea
+                                    disabled={!isAssignedToMe || isSavingThisTask}
+                                    rows={4}
+                                    className="w-full resize-y bg-slate-950 border border-slate-800 rounded-lg px-2 py-1.5 text-[10px] text-slate-200 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
                                     value={taskBuffer.note}
                                     onChange={(event) =>
                                       handleBufferChange(
@@ -514,10 +535,11 @@ export function StaffTasksContent({
                               {isAssignedToMe && (
                                 <button
                                   type="button"
+                                  disabled={isSavingThisTask}
                                   onClick={() => handleSaveSpecificTask(phase, task.__globalIdx)}
-                                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider flex justify-center items-center gap-1 shadow transition cursor-pointer mt-1"
+                                  className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60 text-white py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider flex justify-center items-center gap-1 shadow transition cursor-pointer mt-1"
                                 >
-                                  <Save size={12} /> Lưu Cập Nhật
+                                  <Save size={12} /> {isSavingThisTask ? 'Đang lưu...' : 'Lưu Cập Nhật'}
                                 </button>
                               )}
                             </div>

@@ -453,7 +453,7 @@ describe('admin login flow', () => {
     );
 
     expect(source).toMatch(/if \(!loginResult\.ok\) \{/);
-    expect(source).toMatch(/return;\n    }\n\n    try \{/);
+    expect(source).toMatch(/return;\r?\n    }\r?\n\r?\n    try \{/);
     expect(source).toMatch(/navigateToAdminDashboard\(loginResult\.redirectPath\)/);
   });
 
@@ -494,9 +494,9 @@ describe('admin login flow', () => {
     expect(routeSource).toMatch(/supabase_error_message/);
     expect(serverAuthSource).toMatch(/supabase\.auth\.getUser\(\)/);
     expect(serverAuthSource).toMatch(/\.eq\('auth_user_id', user\.id\)/);
-    expect(serverAuthSource).toMatch(/ADMIN_EMPLOYEE_AUTH_SELECT =\n  'id, auth_user_id, role, status, is_active'/);
+    expect(serverAuthSource).toMatch(/ADMIN_EMPLOYEE_AUTH_SELECT =\r?\n  'id, auth_user_id, role, status, is_active'/);
     expect(serverAuthSource).toMatch(/getServerAuthContextLookup\(ADMIN_EMPLOYEE_AUTH_SELECT\)/);
-    expect(serverAuthSource).not.toMatch(/ADMIN_EMPLOYEE_AUTH_SELECT =\n  '.*employee_id/);
+    expect(serverAuthSource).not.toMatch(/ADMIN_EMPLOYEE_AUTH_SELECT =\r?\n  '.*employee_id/);
     expect(serverAuthSource).toMatch(/ADMIN_WORKSPACE/);
     expect(serverAuthSource).toMatch(/STAFF_WORKSPACE/);
     expect(serverAuthSource).toMatch(/employee_workspace_access/);

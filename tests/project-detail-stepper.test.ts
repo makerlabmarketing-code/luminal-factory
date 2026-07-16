@@ -62,10 +62,10 @@ describe('project detail stepper and task assignee display', () => {
     const detailPage = source('app/admin/projects/[projectId]/page.tsx');
 
     expect(detailPage).toMatch(/function getTaskAssigneeLabel\(task: WorkflowTask\): string/);
-    expect(detailPage).toMatch(/task\.assignedEmployee\?\.fullName \|\| task\.assignedToText \|\| 'Chưa gán'/);
+    expect(detailPage).toMatch(/task\.assignedEmployee\?\.fullName \|\| task\.assignedToText \|\| 'Chưa phân công'/);
     expect(detailPage).toMatch(/function getTaskPackerLabel\(task: WorkflowTask\): string \| null/);
     expect(detailPage).toMatch(/task\.packerEmployee\?\.fullName \|\| task\.packerAssignedText \|\| null/);
-    expect(detailPage).toMatch(/Người thực hiện: \{getTaskAssigneeLabel\(task\)\}/);
+    expect(detailPage).toMatch(/Người phụ trách: \{getTaskAssigneeLabel\(task\)\}/);
     expect(detailPage).toMatch(/Người đóng gói: \{getTaskPackerLabel\(task\) \|\| 'Chưa gán'\}/);
   });
 
