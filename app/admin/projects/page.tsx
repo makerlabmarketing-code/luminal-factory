@@ -300,10 +300,10 @@ export default function AdminProjectManagement() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const workflowItems = await getWorkflowItems();
+      const workflowItems = await getWorkflowItems({ includeClosedProjects: false });
       setItems(workflowItems);
-    } catch (error: any) {
-      showToast('Load failed', error.message || 'Cannot load project workflow.', 'error');
+    } catch {
+      showToast('Không thể tải dự án.', 'Vui lòng thử lại sau.', 'error');
     } finally {
       setLoading(false);
     }
@@ -400,10 +400,11 @@ export default function AdminProjectManagement() {
     showConfirm('Hủy dự án', `Dự án ${project.name} sẽ được đánh dấu hủy và giữ lại lịch sử.`, async () => {
       try {
         await cancelWorkflowProject(project.id as number);
+        setItems((currentItems) => currentItems.filter((item) => item.project_id !== project.id));
         await loadData();
         showToast('Đã hủy dự án.', 'Dự án không bị xóa khỏi dữ liệu.', 'info');
-      } catch (error: any) {
-        showToast('Không thể hủy dự án.', error.message || 'Vui lòng thử lại sau.', 'error');
+      } catch {
+        showToast('Không thể hủy dự án.', 'Vui lòng thử lại sau.', 'error');
       }
     });
   };

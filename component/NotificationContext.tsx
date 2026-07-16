@@ -1,6 +1,7 @@
 // component/NotificationContext.tsx
 'use client';
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Info, CheckCircle2, HelpCircle, AlertCircle } from 'lucide-react';
 
 type ToastType = 'success' | 'error' | 'info';
@@ -18,6 +19,7 @@ interface NotificationContextType {
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
 
 export function NotificationProvider({ children }: { children: React.ReactNode }) {
+  const [mounted, setMounted] = useState(false);
   const [toast, setToast] = useState<{
     show: boolean;
     title: string;
@@ -57,11 +59,15 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       title,
       desc,
       onConfirm: () => {
-        onConfirm();
-        setConfirm(p => ({ ...p, show: false }));
+        void onConfirm();
+        setConfirm((currentConfirm) => ({ ...currentConfirm, show: false }));
       }
     });
   };
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (!toast.show) return;
@@ -74,12 +80,23 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     return () => window.clearTimeout(timeout);
   }, [toast.show, toast.type, toast.durationMs, toast.title, toast.desc]);
 
-  return (
-    <NotificationContext.Provider value={{ showToast, showConfirm }}>
-      {children}
+  useEffect(() => {
+    if (!confirm.show) return undefined;
 
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setConfirm((currentConfirm) => ({ ...currentConfirm, show: false }));
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [confirm.show]);
+
+  const notificationLayer = (
+    <>
       {toast.show && (
-        <div className="fixed right-3 top-3 z-[999999] w-[calc(100vw-1.5rem)] max-w-sm font-sans sm:right-5 sm:top-5">
+        <div className="fixed right-3 top-3 z-[2147483001] isolate w-[calc(100vw-1.5rem)] max-w-sm font-sans sm:right-5 sm:top-5">
           <div className={`rounded-lg border p-4 shadow-2xl ${
             toast.type === 'success'
               ? 'border-emerald-800 bg-emerald-950 text-emerald-50'
@@ -123,20 +140,35 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       )}
 
       {confirm.show && (
-        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 font-sans animate-fadeIn" style={{ zIndex: 999999 }}>
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 w-full max-w-sm text-center space-y-4 shadow-2xl">
-            <div className="w-12 h-12 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center justify-center mx-auto"><HelpCircle className="w-6 h-6" /></div>
-            <div className="space-y-1">
-              <h4 className="text-sm font-black text-slate-100 uppercase tracking-wide">{confirm.title}</h4>
-              <p className="text-xs text-slate-400 leading-relaxed font-medium">{confirm.desc}</p>
+        <div
+          className="fixed inset-0 z-[2147483000] isolate flex items-center justify-center bg-black/85 p-4 font-sans backdrop-blur-sm animate-fadeIn"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="global-confirm-title"
+          aria-describedby="global-confirm-desc"
+        >
+          <div className="w-full max-w-sm space-y-4 rounded-2xl border border-slate-700 bg-slate-900 p-5 text-center shadow-2xl">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-amber-500/20 bg-amber-500/10 text-amber-400">
+              <HelpCircle className="h-6 w-6" />
             </div>
-            <div className="grid grid-cols-2 gap-2 font-sans pt-1">
-              <button onClick={() => setConfirm(p => ({ ...p, show: false }))} className="bg-slate-950 border border-slate-800 p-2.5 rounded-xl text-xs font-bold hover:bg-slate-850 text-slate-400 transition">Hủy bỏ</button>
-              <button onClick={confirm.onConfirm} className="bg-red-600 hover:bg-red-700 text-white font-bold p-2.5 rounded-xl text-xs transition shadow-lg">Xác Nhận</button>
+            <div className="space-y-1">
+              <h4 id="global-confirm-title" className="text-sm font-black uppercase tracking-wide text-slate-100">{confirm.title}</h4>
+              <p id="global-confirm-desc" className="text-xs font-medium leading-relaxed text-slate-300">{confirm.desc}</p>
+            </div>
+            <div className="grid grid-cols-2 gap-2 pt-1 font-sans">
+              <button onClick={() => setConfirm((currentConfirm) => ({ ...currentConfirm, show: false }))} className="rounded-xl border border-slate-800 bg-slate-950 p-2.5 text-xs font-bold text-slate-400 transition hover:bg-slate-850">Hủy bỏ</button>
+              <button onClick={confirm.onConfirm} className="rounded-xl bg-red-600 p-2.5 text-xs font-bold text-white shadow-lg transition hover:bg-red-700">Xác nhận</button>
             </div>
           </div>
         </div>
       )}
+    </>
+  );
+
+  return (
+    <NotificationContext.Provider value={{ showToast, showConfirm }}>
+      {children}
+      {mounted ? createPortal(notificationLayer, document.body) : null}
     </NotificationContext.Provider>
   );
 }

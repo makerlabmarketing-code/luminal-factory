@@ -91,7 +91,7 @@ export default function AdminTaskWorkflowDashboard() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const tList = await getWorkflowItems();
+      const tList = await getWorkflowItems({ includeClosedProjects: false });
       setTasks(tList || []);
     } catch {
       showToast('Lỗi tải dữ liệu', 'Không thể tải dữ liệu công việc.', 'error');
@@ -215,7 +215,7 @@ export default function AdminTaskWorkflowDashboard() {
 
       setEditingPhaseId(null);
       showToast('Đã lưu giai đoạn.', 'Tên hoặc thứ tự giai đoạn đã được cập nhật.', 'success');
-      const tList = await getWorkflowItems();
+      const tList = await getWorkflowItems({ includeClosedProjects: false });
       setTasks(tList);
       if (activeProjectName) {
         const refreshed = tList.filter((item) => item.config_name?.split(' - ')[0] === activeProjectName);
@@ -252,6 +252,7 @@ export default function AdminTaskWorkflowDashboard() {
         if (!targetProjectId) throw new Error('Không tìm thấy dự án cần hủy.');
 
         await cancelWorkflowProject(targetProjectId);
+        setTasks((currentTasks) => currentTasks.filter((item) => item.project_id !== targetProjectId));
         showToast('Đã hủy dự án.', 'Dự án không bị xóa khỏi dữ liệu.', 'info');
         loadData();
       } catch { showToast('Không thể hủy dự án.', 'Vui lòng thử lại sau.', 'error'); }

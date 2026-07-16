@@ -180,6 +180,7 @@ function isTaskCompleted(task: WorkflowTask): boolean {
 }
 
 function isPhaseReadonly(phase: PhaseRecord, canManageProject = false): boolean {
+  if (!canManageProject) return true;
   if (phase.status === 'LOCKED' || phase.status === 'CANCELLED') return true;
   if (phase.status === 'COMPLETED' && !canManageProject) return true;
   return false;
@@ -202,13 +203,13 @@ export default function ProjectDetailPage() {
   const [editingPhaseOrder, setEditingPhaseOrder] = useState('');
   const [driveLinkInput, setDriveLinkInput] = useState('');
   const [selectedPhaseId, setSelectedPhaseId] = useState<number | null>(null);
-  const canManageProject = true;
+  const hasProjectMutationAccess = true;
 
   const loadData = useCallback(async () => {
     setLoading(true);
     setLoadFailed(false);
     try {
-      const workflowItems = await getWorkflowItems();
+      const workflowItems = await getWorkflowItems({ includeClosedProjects: true });
       setItems(workflowItems);
     } catch {
       setLoadFailed(true);
@@ -294,6 +295,8 @@ export default function ProjectDetailPage() {
     phases,
     unassignedTasks,
   };
+  const isProjectCancelled = String(projectDetail.status || '').toUpperCase() === 'CANCELLED';
+  const canManageProject = hasProjectMutationAccess && !isProjectCancelled;
 
   useEffect(() => {
     setDriveLinkInput(firstDescription.project_drive_link || '');
@@ -314,6 +317,7 @@ export default function ProjectDetailPage() {
   }
 
   const handleStartEditPhase = (phase: PhaseRecord) => {
+    if (!canManageProject) return;
     if (!phase.item.phase_id) return;
     setEditingPhaseId(phase.item.phase_id);
     setEditingPhaseName(phase.phaseName);
@@ -321,6 +325,7 @@ export default function ProjectDetailPage() {
   };
 
   const handleSavePhase = async (phase: PhaseRecord) => {
+    if (!canManageProject) return;
     if (!phase.item.project_id || !phase.item.phase_id) return;
     const orderIndex = Number(editingPhaseOrder);
 
@@ -340,6 +345,7 @@ export default function ProjectDetailPage() {
   };
 
   const handleSaveDriveLink = async () => {
+    if (!canManageProject) return;
     try {
       await updateWorkflowProjectDriveLink({
         projectId,
@@ -353,6 +359,7 @@ export default function ProjectDetailPage() {
   };
 
   const handleCancelProject = () => {
+    if (isProjectCancelled) return;
     showConfirm('Hủy dự án', 'Dự án sẽ được đánh dấu hủy và giữ lại lịch sử.', async () => {
       try {
         await cancelWorkflowProject(projectId);
@@ -408,10 +415,10 @@ export default function ProjectDetailPage() {
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            <span className="rounded-lg border border-slate-700 px-3 py-2 text-xs text-slate-300">
+            <span className={`rounded-lg border px-3 py-2 text-xs ${isProjectCancelled ? 'border-red-800 bg-red-950/40 text-red-200' : 'border-slate-700 text-slate-300'}`}>
               Trạng thái: {projectDetail.status || 'Chưa có dữ liệu'}
             </span>
-            <button type="button" onClick={handleCancelProject} className="inline-flex items-center gap-2 rounded-lg border border-amber-800 bg-amber-950/40 px-3 py-2 text-xs font-bold text-amber-200 hover:bg-amber-900/40">
+            <button type="button" disabled={isProjectCancelled} onClick={handleCancelProject} className="inline-flex items-center gap-2 rounded-lg border border-amber-800 bg-amber-950/40 px-3 py-2 text-xs font-bold text-amber-200 hover:bg-amber-900/40 disabled:cursor-not-allowed disabled:border-slate-800 disabled:bg-slate-900 disabled:text-slate-500">
               <Archive className="h-4 w-4" /> Hủy dự án
             </button>
           </div>
@@ -446,6 +453,12 @@ export default function ProjectDetailPage() {
             </div>
           </div>
         </section>
+
+        {isProjectCancelled && (
+          <section className="rounded-lg border border-red-900 bg-red-950/25 p-4 text-xs text-red-100">
+            Dự án đã hủy. Màn hình này chỉ cho xem dữ liệu hiện có; các thao tác sửa phase, task và thông tin dự án đang bị khóa.
+          </section>
+        )}
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_320px]">
           <div className="space-y-4">
@@ -520,7 +533,7 @@ export default function ProjectDetailPage() {
                       )}
                       <button
                         type="button"
-                        disabled={selectedPhase.isLocked}
+                        disabled={selectedPhase.isLocked || !canManageProject}
                         onClick={() => handleStartEditPhase(selectedPhase)}
                         className="inline-flex items-center gap-1 rounded-lg border border-slate-700 px-2 py-1 text-[11px] font-bold text-slate-300 disabled:cursor-not-allowed disabled:opacity-40"
                       >
@@ -556,6 +569,10 @@ export default function ProjectDetailPage() {
                       </div>
                     </div>
                   )}
+
+                  <div className="rounded-lg border border-slate-800 bg-slate-950 p-3 text-xs text-slate-400">
+                    Hiện chỉ hỗ trợ lưu tên giai đoạn và thứ tự. Mô tả phase, người phụ trách phase, deadline phase và chỉnh sửa công việc con cần Phase Workflow Schema / Task Assignment Foundation trước khi mở form lưu dữ liệu.
+                  </div>
 
                   <div className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-2 lg:grid-cols-4">
                     <div>
@@ -604,7 +621,7 @@ export default function ProjectDetailPage() {
                             <td className="py-3 pr-3">{taskStatusLabel(task.status || task.currentPhaseText)}</td>
                             <td className="py-3 pr-3">{task.issueNote || task.note || 'Chưa có ghi chú'}</td>
                             <td className="py-3 pr-3">Chưa có</td>
-                            <td className="py-3">{isPhaseReadonly(selectedPhase, canManageProject) ? 'Chỉ xem' : 'Sửa'}</td>
+                            <td className="py-3">{isPhaseReadonly(selectedPhase, canManageProject) ? 'Chỉ xem' : 'Chưa hỗ trợ'}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -681,8 +698,8 @@ export default function ProjectDetailPage() {
                 </div>
                 <div className="space-y-2">
                   <p className="text-slate-500">Google Drive</p>
-                  <input value={driveLinkInput} onChange={(event) => setDriveLinkInput(event.target.value)} className="w-full rounded border border-slate-800 bg-slate-950 px-3 py-2 text-xs outline-none" placeholder="Nhập link Drive" />
-                  <button onClick={handleSaveDriveLink} className="w-full rounded bg-cyan-600 px-3 py-2 text-xs font-bold text-white">Lưu thông tin</button>
+                  <input disabled={!canManageProject} value={driveLinkInput} onChange={(event) => setDriveLinkInput(event.target.value)} className="w-full rounded border border-slate-800 bg-slate-950 px-3 py-2 text-xs outline-none disabled:cursor-not-allowed disabled:opacity-60" placeholder="Nhập link Drive" />
+                  <button disabled={!canManageProject} onClick={handleSaveDriveLink} className="w-full rounded bg-cyan-600 px-3 py-2 text-xs font-bold text-white disabled:cursor-not-allowed disabled:bg-slate-800 disabled:text-slate-500">Lưu thông tin</button>
                 </div>
               </div>
             </section>

@@ -28,6 +28,16 @@ export interface WorkflowProjectCreateResult {
   warnings: WorkflowWarning[];
 }
 
+interface WorkflowItemsOptions {
+  includeClosedProjects?: boolean;
+}
+
+const CLOSED_PROJECT_STATUSES = new Set(['CANCELLED', 'ARCHIVED']);
+
+function isClosedProjectStatus(status?: string | null): boolean {
+  return CLOSED_PROJECT_STATUSES.has(String(status || '').trim().toUpperCase());
+}
+
 function toWorkflowSetting(project: WorkflowProject, phase: WorkflowPhase): WorkflowSetting {
   const orderIndex = phase.order_index ?? 0;
 
@@ -127,16 +137,24 @@ function toLegacyWorkflowSetting(
   };
 }
 
-export async function getWorkflowItems(): Promise<WorkflowSetting[]> {
-  const projects = await workflowRepository.listProjects();
+export async function getWorkflowItems(options: WorkflowItemsOptions = {}): Promise<WorkflowSetting[]> {
+  const includeClosedProjects = options.includeClosedProjects ?? true;
+  const allProjects = await workflowRepository.listProjects();
+  const projects = includeClosedProjects
+    ? allProjects
+    : allProjects.filter((project) => !isClosedProjectStatus(project.status));
   const projectIds = projects.map((project) => project.id);
   const [phases, legacyTasks] = await Promise.all([
     workflowRepository.listPhasesByProjectIds(projectIds),
     workflowRepository.listLegacyTasks(),
   ]);
+  const projectNames = new Set(projects.map((project) => project.name));
+  const visibleLegacyTasks = includeClosedProjects
+    ? legacyTasks
+    : legacyTasks.filter((task) => projectNames.has(task.projectName || task.project_name || ''));
 
   if (phases.length === 0) {
-    return legacyTasks.map(toLegacyWorkflowSetting);
+    return visibleLegacyTasks.map(toLegacyWorkflowSetting);
   }
 
   const enrichedPhases = phases.map((phase) => ({
@@ -157,7 +175,7 @@ export async function getWorkflowItems(): Promise<WorkflowSetting[]> {
 
   return [
     ...phaseSettings,
-    ...legacyTasks.map(toLegacyWorkflowSetting),
+    ...visibleLegacyTasks.map(toLegacyWorkflowSetting),
   ];
 }
 
