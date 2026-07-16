@@ -49,7 +49,7 @@ describe('project creation UX, detail actions, and request cleanup', () => {
     expect(service).toMatch(/phase_created_at/);
     expect(service).toMatch(/phase_order_index/);
     expect(taskPage).toMatch(/Trạng thái: Chưa hỗ trợ lưu/);
-    expect(detailPage).toMatch(/Timeline giai đoạn/);
+    expect(detailPage).toMatch(/Stepper giai đoạn/);
     expect(detailPage).toMatch(/notFound\(\)/);
     expect(taskPage).not.toMatch(/handleUpdatePhaseStatus/);
   });
@@ -94,7 +94,7 @@ describe('project creation UX, detail actions, and request cleanup', () => {
     expect(detailPage).toMatch(/packerAssignedText/);
     expect(detailPage).toMatch(/currentPhaseText/);
     expect(detailPage).toMatch(/issueNote/);
-    expect(detailPage).toMatch(/Công việc legacy/);
+    expect(detailPage).toMatch(/Công việc chưa phân giai đoạn/);
   });
 
   it('keeps later slice schema as a proposal draft only', () => {
