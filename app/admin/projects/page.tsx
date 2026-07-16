@@ -87,6 +87,23 @@ interface ProjectRecord {
   owner: string;
 }
 
+function projectCreateErrorMessage(error: unknown): string {
+  const status = typeof error === 'object' && error !== null && 'status' in error
+    ? Number((error as { status?: unknown }).status)
+    : null;
+  const code = typeof error === 'object' && error !== null && 'code' in error
+    ? String((error as { code?: unknown }).code || '')
+    : '';
+  const message = error instanceof Error ? error.message : '';
+
+  if (status === 409 || code === 'project_already_exists') return 'Dự án này đã tồn tại.';
+  if (status === 403) return 'Bạn không có quyền tạo dự án.';
+  if (status === 422) return 'Thông tin dự án chưa hợp lệ.';
+  if (code === 'phase_mutation_failed' || message.includes('giai đoạn')) return 'Không thể lưu giai đoạn.';
+
+  return 'Không thể tạo dự án.';
+}
+
 const PIPELINE_TEMPLATES: Record<string, StageTemplate[]> = {
   STANDARD_ARTISAN_KEYCAP: [
     { name: 'Concept', type: 'CONCEPT', weight: 8, taskNames: ['Define story and palette', 'Collect references'] },
@@ -278,6 +295,7 @@ export default function AdminProjectManagement() {
   const [colorwayCode, setColorwayCode] = useState('');
   const [targetDate, setTargetDate] = useState('');
   const [stageOwner, setStageOwner] = useState('');
+  const [isCreatingProject, setIsCreatingProject] = useState(false);
 
   const loadData = async () => {
     setLoading(true);
@@ -318,10 +336,12 @@ export default function AdminProjectManagement() {
   ];
 
   const handleCreateProject = async () => {
+    if (isCreatingProject) return;
     if (!projectName.trim()) return showToast('Missing data', 'Please enter project/product line name.', 'error');
     if (!colorwayName.trim()) return showToast('Missing data', 'Please enter colorway name.', 'error');
     if (!targetDate) return showToast('Missing data', 'Please choose target release date.', 'error');
 
+    setIsCreatingProject(true);
     try {
       const stages = PIPELINE_TEMPLATES.STANDARD_ARTISAN_KEYCAP.map((stage, index, allStages) => ({
         name: stage.name,
@@ -355,8 +375,10 @@ export default function AdminProjectManagement() {
       setStageOwner('');
       await loadData();
       showToast('Created', 'Project colorway pipeline is ready to track.', 'success');
-    } catch (error: any) {
-      showToast('Database error', error.message || 'Cannot create project.', 'error');
+    } catch (error) {
+      showToast('Lỗi lưu trữ', projectCreateErrorMessage(error), 'error');
+    } finally {
+      setIsCreatingProject(false);
     }
   };
 
@@ -603,7 +625,7 @@ export default function AdminProjectManagement() {
 
             <div className="flex gap-2 border-t border-slate-800 pt-3">
               <button onClick={() => setShowAddModal(false)} className="flex-1 bg-slate-950 border border-slate-800 text-slate-300 rounded-lg p-2 text-xs font-bold">Cancel</button>
-              <button onClick={handleCreateProject} className="flex-1 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg p-2 text-xs font-black">Create Pipeline</button>
+              <button disabled={isCreatingProject} onClick={handleCreateProject} className="flex-1 bg-cyan-600 hover:bg-cyan-700 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-lg p-2 text-xs font-black">{isCreatingProject ? 'Đang lưu...' : 'Create Pipeline'}</button>
             </div>
           </div>
         </div>

@@ -129,6 +129,9 @@ Không xóa lịch sử giai đoạn đã hoàn thành.
 | **17.5A. Project Mutation Server Boundary** | ✅ | Hoàn thành, chờ deploy. Create/update/archive project đã đi qua API server `app/api/admin/projects/...` và service server-only `services/server/projectMutations.ts`; browser không còn `projects.insert/update/delete/upsert`. Server kiểm tra `ADMIN_WORKSPACE`, `PROJECT_MANAGE`, project membership role, DTO whitelist, archive bằng status update và không mở browser mutation policy. | `Project Mutation Server Boundary đã Hoàn thành, chờ commit/push/deploy.` | Project Mutation Live Verification. |
 | **17.5B. Project Mutation Live Verification** | ⏳ | Chờ. Cần deploy code server route mới rồi live verify create/update/archive với quyền thật, lỗi 401/403/404/409/422/500, và xác nhận secret chỉ server-side. | `Live verification chờ sau deploy.` | Duyệt và chạy live verification. |
 | **17.5C. Phase RLS** | ⏳ | Chờ. Chưa tạo policy cho `public.phases`; chưa thay query phase/task trong lượt Project Mutation Server Boundary. | `Phase RLS chờ sau live verification hoặc duyệt riêng.` | Thiết kế Phase RLS riêng. |
+| **17.5D. Task RLS** | ⏳ | Chờ. Thiết kế RLS riêng cho `public.tasks` và `public.staff_tasks` sau khi Phase RLS live PASS. Không suy luận assignment từ legacy text fields. | `Task RLS chờ sau Phase RLS.` | Task assignment identity foundation. |
+| **17.5E. Task Assignment Employee ID Foundation** | ⏳ | Chờ. Chuẩn hóa assignment dùng stable employee identifier, tách legacy `tasks.assigned_to`/`packer_assigned` dạng text khỏi quan hệ thật. Không tự backfill hoặc convert assignment nếu chưa duyệt. | `Thiết kế task assignment employee_id foundation.` | Project workflow template foundation. |
+| **17.5F. Phase Template / Project Workflow Template Foundation** | ⏳ | Chờ sau Task Assignment Foundation. Ghi nhận nhu cầu chọn project type và workflow template khi tạo project, preview phases, bật/tắt, đổi tên, kéo thả thứ tự, thêm phase riêng rồi clone phase vào project. Giai đoạn đầu ưu tiên application-layer preset, chưa tạo schema template khi Phase/Task RLS còn đang hoàn thiện. | `Thiết kế Phase Template / Project Workflow Template foundation. Không triển khai trong Phase RLS hiện tại.` | Application-layer preset trước; schema template sau. |
 | **17.6. Access & Permission Foundation Slice 1** | ✅ | Hoàn thành. Đã chạy đúng foundation SQL `20260714082140_access_permission_foundation.sql`: tạo `employee_workspace_access`, `permissions`, `employee_permissions`, helper read-only, RLS và policy SELECT tối thiểu. Không backfill, không thay `is_app_admin()`, không sửa RLS cũ, route, menu, `employees.role` hoặc `project_members`. Validation 16/16 PASS; row count bảng nghiệp vụ không đổi. | `Access & Permission Foundation Slice 1 đã Hoàn thành. Chưa backfill quyền.` | Current Account Access Backfill. |
 | **17.7. Current Account Access Backfill** | ✅ | Hoàn thành. Đã chạy đúng Slice 2 backfill artifact `supabase/backfills/20260714094546_current_account_access_permissions.sql`: tạo 2 workspace access ACTIVE và 17 permission ALLOW ACTIVE cho đúng một tài khoản hiện tại đã map Auth. Không tạo Auth user, không gửi invite, không sửa `employees.role/status/auth_user_id`, `public.is_app_admin()`, finance RLS, routes, middleware, menu hoặc dữ liệu nghiệp vụ. Validation database-state 20/20 PASS; session-context helper checks SKIPPED vì SQL/admin context không có `auth.uid()`. | `Current Account Access Backfill đã Hoàn thành. Bootstrap rows = 19.` | Runtime Permission Bridge. |
 | **17.8. Runtime Permission Bridge** | ✅ | Hoàn thành có điều kiện. Runtime server helper đã đọc `employee_workspace_access` và `employee_permissions`, áp dụng DENY thắng ALLOW, admin gate ưu tiên `ADMIN_WORKSPACE` và giữ legacy ADMIN/OWNER fallback. Staff gate dùng `STAFF_WORKSPACE`; `/staff` là Staff Home thật và `/staff/portal` redirect về `/staff`; Staff login riêng đã bị loại khỏi route tree và login chung resolve workspace mặc định. Navigation hiển thị chuyển khu vực khi user có cả hai workspace. Chưa thay `public.is_app_admin()`, finance RLS hoặc `project_members`. | `Staff unified authentication đã Hoàn thành có điều kiện. Cần commit/push/deploy để live nhận code.` | Employee List Read Bridge SQL rollout. |
@@ -151,6 +154,90 @@ Không xóa lịch sử giai đoạn đã hoàn thành.
 | **29. Batch 7: Operations Modules** | ⏳ | Production, Print Test, Mold, Casting, QC, Inventory và Assets dùng chung app shell và design system. | `Chuyển các module Operations sang app shell và design system mới. Không tạo design system song song.` | Commerce, Staff và Finance UI. |
 | **30. Batch 8: Commerce, Team và Finance UI** | ⏳ | Products, Colorways, Raffles, Orders, Staff, Attendance, Payroll, Expenses và Reports. | `Chuyển Commerce, Team và Finance sang shared page patterns. Giữ nguyên calculation đã khóa bằng regression tests.` | Performance và release readiness. |
 | **31. Batch 9: Release Hardening** | ⏳ | Accessibility, responsive, performance, rerender, dependency vulnerabilities, demo cleanup và production build. | `Thực hiện release readiness audit: lint, typecheck, tests, build, security matrix, accessibility, responsive và performance.` | Release production theo rollout plan. |
+
+---
+
+# 6.1. Future Design Notes
+
+## Phase Template / Project Workflow Template Foundation
+
+**Trạng thái:** Ghi nhận cho triển khai sau Task Assignment Employee ID Foundation.
+
+**Không thuộc phạm vi hiện tại:** Không triển khai trong Phase RLS hiện tại. Không tạo schema `project_templates`, `phase_templates` hoặc `task_templates` khi Phase/Task RLS chưa hoàn thiện.
+
+### Business goal
+
+Nhiều dự án Artisan Keycap và mô hình in 3D dùng các giai đoạn lặp lại. Khi tạo project, người dùng cần chọn project type và workflow template để hệ thống sinh sẵn phases, nhưng vẫn được chỉnh sửa trước và sau khi áp dụng.
+
+### Target project types
+
+- `ARTISAN_KEYCAP`
+- `THREE_D_MODEL`
+- `COMMERCIAL_PRODUCT`
+- `MEDIA`
+- `CUSTOM`
+
+### Target create-project flow
+
+1. Chọn loại dự án.
+2. Chọn workflow template.
+3. Preview danh sách phase.
+4. Bật/tắt từng phase.
+5. Đổi tên phase.
+6. Kéo thả thứ tự phase.
+7. Thêm phase riêng.
+8. Áp dụng để clone phase vào `public.phases`.
+
+Sau khi áp dụng, project sở hữu bản phase riêng. Template sửa sau này không làm thay đổi project cũ.
+
+### Phase template fields target
+
+- `name`
+- `order_index`
+- `description`
+- `default_duration_days`
+- `is_required`
+- `default_role_code`
+
+### Implementation sequence
+
+Giai đoạn đầu dùng application-layer preset để unblock UI và workflow trong lúc hoàn thiện Phase/Task RLS. Giai đoạn sau mới thiết kế schema:
+
+- `project_templates`
+- `phase_templates`
+- `task_templates` nếu cần
+- Trang `/admin/project-templates`
+
+### Initial application-layer presets
+
+`ARTISAN_KEYCAP`:
+
+1. Ý tưởng & Colorway
+2. Concept 2D
+3. Sculpt 3D
+4. Test Print
+5. Chỉnh sửa mẫu
+6. Làm master
+7. Đổ khuôn silicone
+8. Test màu & Casting
+9. Sản xuất
+10. QC
+11. Chụp ảnh & Truyền thông
+12. Mở bán
+13. Đóng gói & Giao hàng
+
+`THREE_D_MODEL`:
+
+1. Tiếp nhận yêu cầu
+2. Thu thập reference
+3. Blockout
+4. Sculpt chi tiết
+5. Kiểm tra mesh
+6. Chia part
+7. Test Print
+8. Chỉnh lỗi
+9. Hoàn thiện file
+10. Bàn giao
 
 ---
 

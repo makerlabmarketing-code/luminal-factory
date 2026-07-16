@@ -37,7 +37,11 @@ export type AuthFlowErrorCode =
   | 'admin_forbidden'
   | 'workspace_forbidden'
   | 'permission_forbidden'
-  | 'admin_verification_failed';
+  | 'admin_verification_failed'
+  | 'payload_validation_failed'
+  | 'project_already_exists'
+  | 'project_duplicate_check_failed'
+  | 'project_insert_failed';
 
 export type AuthFailureStage =
   | 'auth_get_user'
@@ -46,6 +50,10 @@ export type AuthFailureStage =
   | 'admin_role'
   | 'workspace_access'
   | 'permission_check'
+  | 'payload_validation'
+  | 'duplicate_check'
+  | 'admin_client_creation'
+  | 'project_insert'
   | 'unknown';
 
 export interface ServerEmployee {

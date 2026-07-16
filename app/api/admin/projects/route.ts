@@ -37,7 +37,7 @@ function toErrorResponse(error: unknown) {
 export async function POST(request: NextRequest) {
   try {
     const body = (await request.json().catch(() => null)) || {};
-    return jsonNoStore(await createProject(body));
+    return jsonNoStore(await createProject(body), { status: 201 });
   } catch (error) {
     return toErrorResponse(error);
   }

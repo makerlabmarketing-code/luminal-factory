@@ -61,7 +61,8 @@ describe('phase schema alignment', () => {
     const taskPage = source('app/admin/tasks/page.tsx');
 
     expect(taskPage).toMatch(/setShowAddModal\(false\)/);
-    expect(taskPage).toMatch(/catch\s*\{\s*showToast\('Lỗi Lưu Trữ', 'Không thể lưu giai đoạn\.', 'error'\);?\s*\}/);
+    expect(taskPage).toMatch(/catch \(error\)\s*\{\s*showToast\('Lỗi Lưu Trữ', projectCreateErrorMessage\(error\), 'error'\);?\s*\}/);
+    expect(taskPage).toMatch(/message\.includes\('giai đoạn'\)\) return 'Không thể lưu giai đoạn\.'/);
     expect(taskPage).not.toMatch(/catch\s*\{[^}]*setShowAddModal\(false\)/);
   });
 });

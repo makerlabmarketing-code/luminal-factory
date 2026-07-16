@@ -85,21 +85,26 @@ function mutationError({
   status,
   message,
   failureStage,
+  code,
   safeDetails,
 }: {
   status: number;
   message: string;
-  failureStage: 'auth_get_user' | 'employee_lookup' | 'employee_status' | 'workspace_access' | 'permission_check' | 'unknown';
+  failureStage: 'auth_get_user' | 'employee_lookup' | 'employee_status' | 'workspace_access' | 'permission_check' | 'payload_validation' | 'duplicate_check' | 'admin_client_creation' | 'project_insert' | 'unknown';
+  code?: 'session_not_verified' | 'permission_forbidden' | 'admin_verification_failed' | 'payload_validation_failed' | 'project_already_exists' | 'project_duplicate_check_failed' | 'project_insert_failed';
   safeDetails?: Record<string, boolean | number | string | null>;
 }) {
   return new AuthFlowError({
     status,
-    code:
+    code: code || (
       status === 401
         ? 'session_not_verified'
         : status === 403
           ? 'permission_forbidden'
-          : 'admin_verification_failed',
+          : status === 422
+            ? 'payload_validation_failed'
+            : 'admin_verification_failed'
+    ),
     message,
     failureStage,
     safeDetails,
@@ -112,7 +117,8 @@ function assertKnownFields(body: ProjectMutationBody, allowedKeys: Set<string>) 
     throw mutationError({
       status: 422,
       message: 'Dữ liệu dự án có trường không được hỗ trợ.',
-      failureStage: 'unknown',
+      failureStage: 'payload_validation',
+      code: 'payload_validation_failed',
       safeDetails: {
         rejected_field_count: unknownKeys.length,
       },
@@ -126,7 +132,8 @@ function optionalText(value: unknown, fieldName: string): string | null {
     throw mutationError({
       status: 422,
       message: 'Dữ liệu dự án không hợp lệ.',
-      failureStage: 'unknown',
+      failureStage: 'payload_validation',
+      code: 'payload_validation_failed',
       safeDetails: {
         field: fieldName,
       },
@@ -143,7 +150,8 @@ function requiredProjectName(body: ProjectMutationBody): string {
     throw mutationError({
       status: 422,
       message: 'Vui lòng nhập tên dự án.',
-      failureStage: 'unknown',
+      failureStage: 'payload_validation',
+      code: 'payload_validation_failed',
       safeDetails: {
         field: 'projectName',
       },
@@ -162,7 +170,8 @@ function validateStatus(value: unknown): string | null {
     throw mutationError({
       status: 422,
       message: 'Trạng thái dự án không hợp lệ.',
-      failureStage: 'unknown',
+      failureStage: 'payload_validation',
+      code: 'payload_validation_failed',
       safeDetails: {
         field: 'status',
       },
@@ -184,7 +193,8 @@ function validateDateOrder(body: ProjectMutationBody) {
     throw mutationError({
       status: 422,
       message: 'Ngày dự án không hợp lệ.',
-      failureStage: 'unknown',
+      failureStage: 'payload_validation',
+      code: 'payload_validation_failed',
     });
   }
 
@@ -192,7 +202,8 @@ function validateDateOrder(body: ProjectMutationBody) {
     throw mutationError({
       status: 422,
       message: 'Ngày mục tiêu không được trước ngày bắt đầu.',
-      failureStage: 'unknown',
+      failureStage: 'payload_validation',
+      code: 'payload_validation_failed',
     });
   }
 }
@@ -357,7 +368,8 @@ function numericProjectId(rawProjectId: string): number {
     throw mutationError({
       status: 422,
       message: 'Mã dự án không hợp lệ.',
-      failureStage: 'unknown',
+      failureStage: 'payload_validation',
+      code: 'payload_validation_failed',
     });
   }
 
@@ -372,29 +384,32 @@ export async function createProject(body: ProjectMutationBody): Promise<ProjectM
   const projectName = requiredProjectName(body);
   const status = validateStatus(body.status) || 'PROCESSING';
   const supabase = createSupabaseAdminClient();
-  const { data: existingProject, error: existingError } = await supabase
+  const { data: existingProjects, error: existingError } = await supabase
     .from('projects')
     .select('id')
-    .eq('project_name', projectName)
-    .maybeSingle();
+    .ilike('project_name', projectName)
+    .limit(1);
 
   if (existingError) {
     throw mutationError({
       status: 500,
       message: 'Không thể kiểm tra dự án hiện có.',
-      failureStage: 'unknown',
+      failureStage: 'duplicate_check',
+      code: 'project_duplicate_check_failed',
       safeDetails: {
         supabase_error_code: existingError.code ?? 'unknown',
       },
     });
   }
 
+  const existingProject = existingProjects?.[0];
   if (existingProject?.id) {
-    return {
-      success: true,
-      projectId: Number(existingProject.id),
-      deduplicated: true,
-    };
+    throw mutationError({
+      status: 409,
+      message: 'Dự án đã tồn tại.',
+      failureStage: 'duplicate_check',
+      code: 'project_already_exists',
+    });
   }
 
   const { data, error } = await supabase
@@ -407,7 +422,8 @@ export async function createProject(body: ProjectMutationBody): Promise<ProjectM
     throw mutationError({
       status: 500,
       message: 'Không thể tạo dự án.',
-      failureStage: 'unknown',
+      failureStage: 'project_insert',
+      code: 'project_insert_failed',
       safeDetails: {
         supabase_error_code: error?.code ?? 'unknown',
       },

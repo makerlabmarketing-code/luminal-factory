@@ -32,6 +32,23 @@ interface WorkflowFormPhase {
   tasks: WorkflowFormTask[];
 }
 
+function projectCreateErrorMessage(error: unknown): string {
+  const status = typeof error === 'object' && error !== null && 'status' in error
+    ? Number((error as { status?: unknown }).status)
+    : null;
+  const code = typeof error === 'object' && error !== null && 'code' in error
+    ? String((error as { code?: unknown }).code || '')
+    : '';
+  const message = error instanceof Error ? error.message : '';
+
+  if (status === 409 || code === 'project_already_exists') return 'Dự án này đã tồn tại.';
+  if (status === 403) return 'Bạn không có quyền tạo dự án.';
+  if (status === 422) return 'Thông tin dự án chưa hợp lệ.';
+  if (code === 'phase_mutation_failed' || message.includes('giai đoạn')) return 'Không thể lưu giai đoạn.';
+
+  return 'Không thể tạo dự án.';
+}
+
 export default function AdminTaskWorkflowDashboard() {
   const { showToast, showConfirm } = useNotification();
   const [tasks, setTasks] = useState<WorkflowSetting[]>([]);
@@ -46,6 +63,7 @@ export default function AdminTaskWorkflowDashboard() {
   const [newProjectName, setNewProjectName] = useState('');
   const [projectDeadline, setProjectDeadline] = useState('');
   const [formPhases, setFormPhases] = useState<WorkflowFormPhase[]>([]);
+  const [isCreatingProject, setIsCreatingProject] = useState(false);
 
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [activeProjectName, setActiveProjectName] = useState('');
@@ -103,9 +121,11 @@ export default function AdminTaskWorkflowDashboard() {
   };
 
   const handleCreateProject = async () => {
+    if (isCreatingProject) return;
     if (!newProjectName.trim()) return showToast('Thiếu dữ liệu', 'Vui lòng nhập tên dự án tổng!', 'error');
     if (!projectDeadline) return showToast('Thiếu thời hạn', 'Vui lòng chọn ngày hạn dự án!', 'error');
 
+    setIsCreatingProject(true);
     try {
       await createWorkflowProject({
         projectName: newProjectName,
@@ -137,8 +157,10 @@ export default function AdminTaskWorkflowDashboard() {
       setShowAddModal(false);
       await loadData();
       showToast('Thành công', 'Đã khởi tạo dự án gọn gàng!', 'success');
-    } catch {
-      showToast('Lỗi Lưu Trữ', 'Không thể lưu giai đoạn.', 'error');
+    } catch (error) {
+      showToast('Lỗi Lưu Trữ', projectCreateErrorMessage(error), 'error');
+    } finally {
+      setIsCreatingProject(false);
     }
   };
 
@@ -513,7 +535,7 @@ export default function AdminTaskWorkflowDashboard() {
 
             <div className="pt-2 border-t border-slate-800 flex gap-2">
               <button type="button" onClick={() => setShowAddModal(false)} className="flex-1 bg-slate-950 border border-slate-800 p-2.5 rounded-xl font-bold text-slate-400">Hủy</button>
-              <button type="button" onClick={handleCreateProject} className="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-black p-2.5 rounded-xl uppercase text-xs cursor-pointer">🚀 Phát lệnh sản xuất</button>
+              <button type="button" disabled={isCreatingProject} onClick={handleCreateProject} className="flex-1 bg-purple-600 hover:bg-purple-700 disabled:opacity-60 disabled:cursor-not-allowed text-white font-black p-2.5 rounded-xl uppercase text-xs cursor-pointer">{isCreatingProject ? 'Đang lưu...' : '🚀 Phát lệnh sản xuất'}</button>
             </div>
           </div>
         </div>

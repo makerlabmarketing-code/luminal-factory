@@ -11,6 +11,18 @@ type LegacyWorkflowTask = WorkflowTask & {
   current_phase?: string;
 };
 
+export class WorkflowRequestError extends Error {
+  status: number;
+  code?: string;
+
+  constructor(message: string, status: number, code?: string) {
+    super(message);
+    this.name = 'WorkflowRequestError';
+    this.status = status;
+    this.code = code;
+  }
+}
+
 function toNumber(value: unknown): number | null {
   if (typeof value === 'number' && Number.isFinite(value)) return value;
   if (typeof value === 'string' && value.trim() !== '' && !Number.isNaN(Number(value))) {
@@ -154,6 +166,7 @@ async function requestProjectMutation<TResponse>(
   });
   const payload = (await response.json().catch(() => null)) as TResponse | {
     message?: string;
+    code?: string;
   } | null;
 
   if (!response.ok) {
@@ -165,8 +178,18 @@ async function requestProjectMutation<TResponse>(
         ? payload.message
         : null;
 
-    throw new Error(
-      message || 'Khong the cap nhat du an.'
+    const code =
+      payload &&
+      typeof payload === 'object' &&
+      'code' in payload &&
+      typeof payload.code === 'string'
+        ? payload.code
+        : undefined;
+
+    throw new WorkflowRequestError(
+      message || 'Khong the cap nhat du an.',
+      response.status,
+      code
     );
   }
 
