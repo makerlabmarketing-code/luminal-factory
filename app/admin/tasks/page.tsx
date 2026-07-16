@@ -60,8 +60,8 @@ export default function AdminTaskWorkflowDashboard() {
 
       const emps = await getActiveEmployees();
       setEmployees(emps || []);
-    } catch (e: any) {
-      showToast('Lỗi tải dữ liệu', e.message, 'error');
+    } catch {
+      showToast('Lỗi tải dữ liệu', 'Không thể tải dữ liệu công việc.', 'error');
     }
     setLoading(false);
   };
@@ -118,7 +118,7 @@ export default function AdminTaskWorkflowDashboard() {
 
               return {
                 name: task.name?.trim(),
-                assignee_id: matchedEmployee?.employee_id || matchedEmployee?.id || null,
+                assignee_id: matchedEmployee?.id || null,
                 assignee_name: matchedEmployee?.full_name || '',
                 assignee: matchedEmployee?.full_name || '',
                 deadline: task.deadline,
@@ -192,7 +192,7 @@ export default function AdminTaskWorkflowDashboard() {
 
       if (field === 'assignee_id') {
         const matchedEmployee = findEmployeeByIdentifier(employees, value);
-        currentTask.assignee_id = matchedEmployee?.employee_id || matchedEmployee?.id || null;
+        currentTask.assignee_id = matchedEmployee?.id || null;
         currentTask.assignee_name = matchedEmployee?.full_name || '';
         currentTask.assignee = matchedEmployee?.full_name || '';
 
@@ -441,7 +441,7 @@ export default function AdminTaskWorkflowDashboard() {
                               onChange={(e) => handleUpdateNestedTaskInline(phase.key, phase.description, tIdx, 'assignee_id', e.target.value)}
                             >
                               <option value="">Gán thợ...</option>
-                              {employees.map(emp => <option key={emp.id} value={emp.employee_id || emp.id}>{emp.full_name}</option>)}
+                              {employees.map(emp => <option key={emp.id} value={emp.id}>{emp.full_name}</option>)}
                             </select>
                             <input type="datetime-local" className="w-full bg-slate-950 border border-slate-800 rounded p-1 text-amber-400 text-[10px] cursor-pointer" value={task.deadline || ''} onChange={(e) => handleUpdateNestedTaskInline(phase.key, phase.description, tIdx, 'deadline', e.target.value)} />
                           </div>
@@ -499,7 +499,7 @@ export default function AdminTaskWorkflowDashboard() {
                     {p.tasks?.map((t: WorkflowFormTask, tIdx: number) => (
                       <div key={tIdx} className="flex flex-col sm:flex-row gap-2 p-2 bg-slate-950 rounded-lg border border-slate-850 items-center">
                         <input type="text" className="flex-1 bg-slate-900 border border-slate-800 p-1.5 rounded text-slate-200 focus:outline-none text-xs" placeholder="Tên công việc con..." value={t.name} onChange={(e) => { const n = [...formPhases]; n[pIdx].tasks[tIdx].name = e.target.value; setFormPhases(n); }} />
-                        <select className="bg-slate-900 border border-slate-800 p-1.5 rounded text-slate-400 focus:outline-none text-xs cursor-pointer" value={t.assignee_id || ''} onChange={(e) => { const n = [...formPhases]; n[pIdx].tasks[tIdx].assignee_id = e.target.value; setFormPhases(n); }}><option value="">Gán thợ...</option>{employees.map(e => <option key={e.id} value={e.employee_id || e.id}>{e.full_name}</option>)}</select>
+                        <select className="bg-slate-900 border border-slate-800 p-1.5 rounded text-slate-400 focus:outline-none text-xs cursor-pointer" value={t.assignee_id || ''} onChange={(e) => { const n = [...formPhases]; n[pIdx].tasks[tIdx].assignee_id = e.target.value; setFormPhases(n); }}><option value="">Gán thợ...</option>{employees.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}</select>
                         <input type="datetime-local" className="bg-slate-900 border border-slate-800 p-1.5 rounded text-amber-400 font-mono text-xs cursor-pointer" value={t.deadline} onChange={(e) => { const n = [...formPhases]; n[pIdx].tasks[tIdx].deadline = e.target.value; setFormPhases(n); }} />
                         <button type="button" onClick={() => handleRemoveTaskInForm(pIdx, tIdx)} className="text-slate-500 hover:text-red-400 cursor-pointer"><Trash2 className="w-4 h-4"/></button>
                       </div>

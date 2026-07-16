@@ -61,10 +61,50 @@ function attachTasksToPhases(
   );
 }
 
+function toLegacyWorkflowSetting(
+  task: Awaited<ReturnType<typeof workflowRepository.listLegacyTasks>>[number]
+): WorkflowSetting {
+  const projectName = task.project_name || 'Dự án legacy';
+  const phaseName = task.current_phase || task.status || 'Legacy';
+
+  return {
+    id: `legacy-task-${task.id}`,
+    key: `LEGACY_TASK_${task.id}`,
+    value: task.status || 'TODO',
+    group_name: 'PRODUCTION_WORKFLOW_LEGACY',
+    config_name: `${projectName} - ${phaseName}`,
+    param_type: task.deadline || '',
+    description: JSON.stringify({
+      project_drive_link: '',
+      project_deadline: task.deadline || '',
+      stage_name: phaseName,
+      stage_type: 'LEGACY_TASK',
+      stage_owner: task.assignee_name || task.assignee || '',
+      stage_deadline: task.deadline || '',
+      tasks_list: [{
+        id: task.id,
+        name: task.name || projectName,
+        assignee: task.assignee_name || task.assignee || '',
+        assignee_id: null,
+        assignee_name: task.assignee_name || task.assignee || '',
+        deadline: task.deadline || '',
+        note: task.note || '',
+        status: task.status || 'TODO',
+      }],
+    }),
+  };
+}
+
 export async function getWorkflowItems(): Promise<WorkflowSetting[]> {
   const projects = await workflowRepository.listProjects();
   const projectIds = projects.map((project) => project.id);
   const phases = await workflowRepository.listPhasesByProjectIds(projectIds);
+
+  if (phases.length === 0) {
+    const legacyTasks = await workflowRepository.listLegacyTasks();
+    return legacyTasks.map(toLegacyWorkflowSetting);
+  }
+
   const phaseIds = phases.map((phase) => phase.id);
   const tasks = await workflowRepository.listTasksByPhaseIds(phaseIds);
 

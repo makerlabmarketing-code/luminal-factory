@@ -4,7 +4,7 @@ import type { Employee } from '@/lib/types/employee';
 export async function getActiveEmployees(): Promise<Employee[]> {
   const { data, error } = await supabase
     .from('employees')
-    .select('id, employee_id, full_name, title, status')
+    .select('id, full_name, title, status')
     .eq('status', 'ACTIVE')
     .order('full_name', { ascending: true });
 
@@ -15,7 +15,7 @@ export async function getActiveEmployees(): Promise<Employee[]> {
 
 export function getEmployeeLabel(employee: Employee | null | undefined): string {
   if (!employee) return '';
-  return employee.full_name || String(employee.employee_id || employee.id || '');
+  return employee.full_name || String(employee.id || '');
 }
 
 export function findEmployeeByIdentifier(
@@ -25,10 +25,7 @@ export function findEmployeeByIdentifier(
   if (identifier === null || identifier === undefined || identifier === '') return undefined;
 
   return employees.find((employee) => {
-    return (
-      String(employee.id) === String(identifier) ||
-      String(employee.employee_id) === String(identifier)
-    );
+    return String(employee.id) === String(identifier);
   });
 }
 
