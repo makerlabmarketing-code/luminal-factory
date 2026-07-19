@@ -16,6 +16,7 @@ interface ProjectRow {
   project_name?: string | null;
   status?: string | null;
   drive_url?: string | null;
+  project_deadline?: string | null;
   created_at?: string | null;
 }
 
@@ -29,6 +30,7 @@ export interface ProjectMutationResult {
   projectId: number;
   deduplicated?: boolean;
   archived?: boolean;
+  deadlinePersisted?: boolean;
 }
 
 const CREATE_PROJECT_KEYS = new Set([
@@ -36,7 +38,7 @@ const CREATE_PROJECT_KEYS = new Set([
   'description',
   'status',
   'startDate',
-  'targetDate',
+  'projectDeadline',
   'metadata',
 ]);
 
@@ -45,7 +47,7 @@ const UPDATE_PROJECT_KEYS = new Set([
   'description',
   'status',
   'startDate',
-  'targetDate',
+  'projectDeadline',
   'progress',
   'driveLink',
   'expectedUpdatedAt',
@@ -56,7 +58,7 @@ const PROJECT_OWNER_FIELDS = new Set([
   'description',
   'status',
   'startDate',
-  'targetDate',
+  'projectDeadline',
   'driveLink',
   'expectedUpdatedAt',
 ]);
@@ -64,7 +66,7 @@ const PROJECT_OWNER_FIELDS = new Set([
 const PROJECT_MANAGER_FIELDS = new Set([
   'status',
   'startDate',
-  'targetDate',
+  'projectDeadline',
   'progress',
   'driveLink',
   'expectedUpdatedAt',
@@ -81,6 +83,15 @@ const VALID_PROJECT_STATUSES = new Set([
   'ARCHIVED',
   'CANCELLED',
 ]);
+
+const DUPLICATE_BLOCKING_PROJECT_STATUSES = [
+  'DRAFT',
+  'PLANNING',
+  'PROCESSING',
+  'IN_PROGRESS',
+  'BLOCKED',
+  'ON_HOLD',
+] as const;
 
 function mutationError({
   status,
@@ -145,6 +156,51 @@ function optionalText(value: unknown, fieldName: string): string | null {
   return trimmed === '' ? null : trimmed;
 }
 
+function normalizeProjectName(value: string): string {
+  return value.trim().toLocaleLowerCase('vi-VN');
+}
+
+function isIsoDateOnly(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}T00:00:00.000Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
+function optionalIsoDate(value: unknown, fieldName: string): string | null {
+  const text = optionalText(value, fieldName);
+  if (text === null) return null;
+
+  if (!isIsoDateOnly(text)) {
+    throw mutationError({
+      status: 422,
+      message: 'Ngày dự án không hợp lệ.',
+      failureStage: 'payload_validation',
+      code: 'payload_validation_failed',
+      safeDetails: {
+        field: fieldName,
+      },
+    });
+  }
+
+  return text;
+}
+
+function isMissingProjectDeadlineColumn(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const details = error as { code?: unknown; message?: unknown; details?: unknown; hint?: unknown };
+  const code = typeof details.code === 'string' ? details.code : '';
+  const errorText = [
+    details.message,
+    details.details,
+    details.hint,
+  ]
+    .filter((value): value is string => typeof value === 'string')
+    .join(' ')
+    .toLocaleLowerCase('en-US');
+
+  return (code === '42703' || code === 'PGRST204') && errorText.includes('project_deadline');
+}
+
 function requiredProjectName(body: ProjectMutationBody): string {
   const projectName = optionalText(body.projectName, 'projectName');
   if (!projectName) {
@@ -183,21 +239,13 @@ function validateStatus(value: unknown): string | null {
 }
 
 function validateDateOrder(body: ProjectMutationBody) {
-  const startDate = optionalText(body.startDate, 'startDate');
-  const targetDate = optionalText(body.targetDate, 'targetDate');
+  const startDate = optionalIsoDate(body.startDate, 'startDate');
+  const projectDeadline = optionalIsoDate(body.projectDeadline, 'projectDeadline');
 
-  if (!startDate || !targetDate) return;
+  if (!startDate || !projectDeadline) return;
 
   const start = new Date(startDate);
-  const target = new Date(targetDate);
-  if (Number.isNaN(start.getTime()) || Number.isNaN(target.getTime())) {
-    throw mutationError({
-      status: 422,
-      message: 'Ngày dự án không hợp lệ.',
-      failureStage: 'payload_validation',
-      code: 'payload_validation_failed',
-    });
-  }
+  const target = new Date(projectDeadline);
 
   if (target < start) {
     throw mutationError({
@@ -244,11 +292,21 @@ async function loadProject(projectId: number): Promise<ProjectRow> {
   const supabase = createSupabaseAdminClient();
   const { data, error } = await supabase
     .from('projects')
-    .select('id, project_name, status, drive_url, created_at')
+    .select('id, project_name, status, drive_url, project_deadline, created_at')
     .eq('id', projectId)
     .maybeSingle();
 
   if (error) {
+    if (isMissingProjectDeadlineColumn(error)) {
+      const fallback = await supabase
+        .from('projects')
+        .select('id, project_name, status, drive_url, created_at')
+        .eq('id', projectId)
+        .maybeSingle();
+
+      if (!fallback.error && fallback.data) return fallback.data as ProjectRow;
+    }
+
     throw mutationError({
       status: 500,
       message: 'Không thể tải dự án.',
@@ -337,16 +395,84 @@ function assertRoleCanUpdateFields(role: ProjectRoleCode | null, body: ProjectMu
 }
 
 function projectUpdatePayload(body: ProjectMutationBody) {
-  const payload: Record<string, string> = {};
+  const payload: Record<string, string | null> = {};
   const projectName = optionalText(body.projectName, 'projectName');
   const driveLink = optionalText(body.driveLink, 'driveLink');
+  const projectDeadline = optionalIsoDate(body.projectDeadline, 'projectDeadline');
   const status = validateStatus(body.status);
 
   if (projectName) payload.project_name = projectName;
   if (driveLink !== null) payload.drive_url = driveLink;
+  if (Object.prototype.hasOwnProperty.call(body, 'projectDeadline')) {
+    payload.project_deadline = projectDeadline;
+  }
   if (status) payload.status = status;
 
   return payload;
+}
+
+async function insertProjectRow(params: {
+  projectName: string;
+  status: string;
+  projectDeadline: string | null;
+}): Promise<{ id: number; deadlinePersisted: boolean }> {
+  const supabase = createSupabaseAdminClient();
+  const basePayload = {
+    project_name: params.projectName,
+    status: params.status,
+    drive_url: '',
+  };
+  const payload = params.projectDeadline
+    ? { ...basePayload, project_deadline: params.projectDeadline }
+    : basePayload;
+
+  const { data, error } = await supabase
+    .from('projects')
+    .insert([payload])
+    .select('id')
+    .single();
+
+  if (!error && data) {
+    return {
+      id: Number(data.id),
+      deadlinePersisted: Boolean(params.projectDeadline),
+    };
+  }
+
+  if (params.projectDeadline && isMissingProjectDeadlineColumn(error)) {
+    const fallback = await supabase
+      .from('projects')
+      .insert([basePayload])
+      .select('id')
+      .single();
+
+    if (!fallback.error && fallback.data) {
+      return {
+        id: Number(fallback.data.id),
+        deadlinePersisted: false,
+      };
+    }
+
+    throw mutationError({
+      status: 500,
+      message: 'Không thể tạo dự án.',
+      failureStage: 'project_insert',
+      code: 'project_insert_failed',
+      safeDetails: {
+        supabase_error_code: fallback.error?.code ?? 'unknown',
+      },
+    });
+  }
+
+  throw mutationError({
+    status: 500,
+    message: 'Không thể tạo dự án.',
+    failureStage: 'project_insert',
+    code: 'project_insert_failed',
+    safeDetails: {
+      supabase_error_code: error?.code ?? 'unknown',
+    },
+  });
 }
 
 async function assertProjectMutationAccess(projectId: number, body: ProjectMutationBody) {
@@ -384,12 +510,12 @@ export async function createProject(body: ProjectMutationBody): Promise<ProjectM
 
   const projectName = requiredProjectName(body);
   const status = validateStatus(body.status) || 'PROCESSING';
+  const projectDeadline = optionalIsoDate(body.projectDeadline, 'projectDeadline');
   const supabase = createSupabaseAdminClient();
   const { data: existingProjects, error: existingError } = await supabase
     .from('projects')
-    .select('id')
-    .ilike('project_name', projectName)
-    .limit(1);
+    .select('id, project_name, status')
+    .in('status', [...DUPLICATE_BLOCKING_PROJECT_STATUSES]);
 
   if (existingError) {
     throw mutationError({
@@ -403,37 +529,29 @@ export async function createProject(body: ProjectMutationBody): Promise<ProjectM
     });
   }
 
-  const existingProject = existingProjects?.[0];
+  const normalizedProjectName = normalizeProjectName(projectName);
+  const existingProject = (existingProjects || []).find((project) => (
+    normalizeProjectName(String(project.project_name || '')) === normalizedProjectName
+  ));
   if (existingProject?.id) {
     throw mutationError({
       status: 409,
-      message: 'Dự án đã tồn tại.',
+      message: `Dự án đang trùng với #${existingProject.id} (${existingProject.status || 'chưa có trạng thái'}).`,
       failureStage: 'duplicate_check',
       code: 'project_already_exists',
-    });
-  }
-
-  const { data, error } = await supabase
-    .from('projects')
-    .insert([{ project_name: projectName, status, drive_url: '' }])
-    .select('id')
-    .single();
-
-  if (error || !data) {
-    throw mutationError({
-      status: 500,
-      message: 'Không thể tạo dự án.',
-      failureStage: 'project_insert',
-      code: 'project_insert_failed',
       safeDetails: {
-        supabase_error_code: error?.code ?? 'unknown',
+        duplicate_project_id: Number(existingProject.id),
+        duplicate_project_status: existingProject.status || null,
       },
     });
   }
 
+  const project = await insertProjectRow({ projectName, status, projectDeadline });
+
   return {
     success: true,
-    projectId: Number(data.id),
+    projectId: project.id,
+    deadlinePersisted: project.deadlinePersisted,
   };
 }
 
@@ -475,6 +593,17 @@ export async function updateProject(
   const supabase = createSupabaseAdminClient();
   const { error } = await supabase.from('projects').update(payload).eq('id', projectId);
   if (error) {
+    if (payload.project_deadline !== undefined && isMissingProjectDeadlineColumn(error)) {
+      throw mutationError({
+        status: 409,
+        message: 'Dự án chưa có trường deadline tổng. Cần chạy migration project_deadline trước khi lưu deadline.',
+        failureStage: 'unknown',
+        safeDetails: {
+          project_deadline_supported: false,
+        },
+      });
+    }
+
     throw mutationError({
       status: 500,
       message: 'Không thể cập nhật dự án.',

@@ -56,6 +56,22 @@ function assertKnownFields(row: GenericRow, allowedFields: readonly string[], co
   }
 }
 
+function isMissingProjectDeadlineColumn(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const details = error as { code?: unknown; message?: unknown; details?: unknown; hint?: unknown };
+  const code = typeof details.code === 'string' ? details.code : '';
+  const errorText = [
+    details.message,
+    details.details,
+    details.hint,
+  ]
+    .filter((value): value is string => typeof value === 'string')
+    .join(' ')
+    .toLocaleLowerCase('en-US');
+
+  return (code === '42703' || code === 'PGRST204') && errorText.includes('project_deadline');
+}
+
 export function normalizeProjectRow(row: GenericRow): WorkflowProject | null {
   const id = pickFirstNumber(row, ['id']);
   if (id === null) return null;
@@ -225,11 +241,15 @@ async function requestProjectMutation<TResponse>(
 
 export class WorkflowRepository {
   async listProjects(): Promise<WorkflowProject[]> {
-    const { data, error } = await supabase.from('projects').select('id, project_name, drive_url, status, created_at')
+    const withDeadline = await supabase.from('projects').select('id, project_name, drive_url, status, project_deadline, created_at')
       .order('id', { ascending: false });
-    if (error) throw error;
+    const result = withDeadline.error && isMissingProjectDeadlineColumn(withDeadline.error)
+      ? await supabase.from('projects').select('id, project_name, drive_url, status, created_at')
+        .order('id', { ascending: false })
+      : withDeadline;
+    if (result.error) throw result.error;
 
-    return (data || [])
+    return (result.data || [])
       .map((row) => normalizeProjectRow(row as GenericRow))
       .filter((row): row is WorkflowProject => row !== null);
   }
@@ -289,7 +309,7 @@ export class WorkflowRepository {
         method: 'POST',
         body: JSON.stringify({
           projectName: params.projectName.trim(),
-          targetDate: params.projectDeadline,
+          projectDeadline: params.projectDeadline,
           status: 'PROCESSING',
         }),
       }
