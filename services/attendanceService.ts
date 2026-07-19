@@ -31,8 +31,10 @@ export function calculateShiftUnitsFromHours(hours: number): number {
 
 export function calculateShiftUnitsFromMinutes(workedMinutes: number): number {
   if (!Number.isFinite(workedMinutes) || workedMinutes <= 0) return 0;
+  if (workedMinutes <= SHIFT_MINUTES) return 1;
+  if (workedMinutes <= SHIFT_MINUTES * 2) return 2;
 
-  return Math.ceil(workedMinutes / SHIFT_MINUTES);
+  return 3;
 }
 
 function normalizeHoursValue(value: number | string | null | undefined): number | null {

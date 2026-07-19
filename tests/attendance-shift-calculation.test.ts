@@ -16,6 +16,12 @@ describe('attendance shift calculation', () => {
     expect(calculateShiftUnitsFromMinutes(minutes)).toBe(shifts);
   });
 
+  it('caps shift calculation at three shifts when worked time is over six hours', () => {
+    expect(calculateShiftUnitsFromMinutes(361)).toBe(3);
+    expect(calculateShiftUnitsFromMinutes(540)).toBe(3);
+    expect(calculateShiftUnitsFromMinutes(720)).toBe(3);
+  });
+
   it('keeps duplicate records as one attendance window', () => {
     const [record] = mergeAttendanceRecords([
       {

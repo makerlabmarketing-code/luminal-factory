@@ -21,7 +21,20 @@ import {
 
 const ATTENDANCE_SELECT =
   'id, employee_id, work_date, shift_name, check_in, check_out, total_hours, total_salary, status';
-const FACILITY_SELECT = 'id, name, facility_name, code, lat, lng, radius';
+const FACILITY_SELECT = 'id, facility_name, lat, lng, radius';
+const STAFF_ATTENDANCE_ALLOWED_FIELDS = new Set(['userLat', 'userLng']);
+
+class StaffAttendanceError extends Error {
+  status: number;
+  code: string;
+
+  constructor(status: number, code: string, message: string) {
+    super(message);
+    this.name = 'StaffAttendanceError';
+    this.status = status;
+    this.code = code;
+  }
+}
 
 function normalizeTimeValue(value: string | null | undefined): string | null {
   if (!value) return null;
@@ -66,22 +79,34 @@ async function loadFacilities() {
   const supabase = await createClient();
   const { data, error } = await supabase.from('facilities').select(FACILITY_SELECT);
 
-  if (error) return [];
+  if (error) {
+    throw new StaffAttendanceError(
+      500,
+      'attendance_load_failed',
+      'Không thể tải cấu hình cơ sở chấm công.'
+    );
+  }
 
   return (data || []) as Facility[];
 }
 
-async function getOpenAttendanceRecord(employeeId: number | string, workDate: string) {
+async function getOpenAttendanceRecord(employeeId: number | string, workDate?: string) {
   const supabase = await createClient();
-  const { data, error } = await supabase
+  let query = supabase
     .from('attendance')
     .select(ATTENDANCE_SELECT)
     .eq('employee_id', employeeId)
-    .eq('work_date', workDate)
     .is('check_out', null)
     .not('check_in', 'is', null)
+    .order('work_date', { ascending: false })
     .order('id', { ascending: false })
     .limit(1);
+
+  if (workDate) {
+    query = query.eq('work_date', workDate);
+  }
+
+  const { data, error } = await query;
 
   if (error) throw error;
 
@@ -116,7 +141,7 @@ async function loadAttendancePayload(employee: ServerEmployee, monthInput: strin
   const todayStr = formatBusinessDateInput(businessDateFromInstant(new Date()));
   const currentShift = autoDetectShift(new Date());
 
-  const openRecord = await getOpenAttendanceRecord(employee.id, todayStr);
+  const openRecord = await getOpenAttendanceRecord(employee.id);
   const currentShiftRecord = openRecord
     ? null
     : await getAttendanceRecordByShift(employee.id, todayStr, currentShift);
@@ -146,12 +171,44 @@ async function loadAttendancePayload(employee: ServerEmployee, monthInput: strin
   };
 }
 
-function toErrorResponse(error: unknown) {
-  if (error instanceof AuthFlowError) {
-    return NextResponse.json({ error: error.message }, { status: error.status });
+function toStaffAttendanceErrorResponse(error: unknown) {
+  if (error instanceof StaffAttendanceError) {
+    return NextResponse.json(
+      { error: error.message, code: error.code },
+      { status: error.status }
+    );
   }
 
-  return NextResponse.json({ error: 'Không thể xử lý dữ liệu chấm công.' }, { status: 500 });
+  if (error instanceof AuthFlowError) {
+    const codeByAuthCode: Record<string, string> = {
+      session_not_verified: 'attendance_unauthenticated',
+      employee_not_linked: 'attendance_employee_not_found',
+      employee_inactive: 'attendance_employee_inactive',
+      workspace_forbidden: 'attendance_workspace_required',
+    };
+
+    return NextResponse.json(
+      { error: error.message, code: codeByAuthCode[error.code] || 'attendance_load_failed' },
+      { status: error.status }
+    );
+  }
+
+  return NextResponse.json(
+    { error: 'Không thể xử lý dữ liệu chấm công.', code: 'attendance_load_failed' },
+    { status: 500 }
+  );
+}
+
+function assertKnownPostFields(body: Record<string, unknown>) {
+  const unknownFields = Object.keys(body).filter((key) => !STAFF_ATTENDANCE_ALLOWED_FIELDS.has(key));
+
+  if (unknownFields.length > 0) {
+    throw new StaffAttendanceError(
+      422,
+      'attendance_invalid_payload',
+      'Dữ liệu chấm công không hợp lệ.'
+    );
+  }
 }
 
 export async function GET(request: Request) {
@@ -166,7 +223,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json(payload);
   } catch (error) {
-    return toErrorResponse(error);
+    return toStaffAttendanceErrorResponse(error);
   }
 }
 
@@ -174,20 +231,35 @@ export async function POST(request: Request) {
   try {
     const authContext = await requireWorkspaceAccess('STAFF_WORKSPACE');
     const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
+
+    if (!body) {
+      return NextResponse.json(
+        { error: 'Dữ liệu chấm công không hợp lệ.', code: 'attendance_invalid_payload' },
+        { status: 422 }
+      );
+    }
+
+    assertKnownPostFields(body);
+
     const userLat = Number(body?.userLat);
     const userLng = Number(body?.userLng);
 
     if (!Number.isFinite(userLat) || !Number.isFinite(userLng)) {
-      return NextResponse.json({ error: 'Thiếu thông tin định vị hợp lệ.' }, { status: 400 });
+      throw new StaffAttendanceError(
+        422,
+        'attendance_invalid_payload',
+        'Thiếu thông tin định vị hợp lệ.'
+      );
     }
 
     const branches = await loadFacilities();
     const matchedBranch = findMatchedBranch(authContext.employee, branches);
 
     if (!matchedBranch || !matchedBranch.lat || !matchedBranch.lng || !matchedBranch.radius) {
-      return NextResponse.json(
-        { error: 'Cơ sở được giao chưa được cấu hình tọa độ GPS.' },
-        { status: 400 }
+      throw new StaffAttendanceError(
+        500,
+        'attendance_load_failed',
+        'Cơ sở được giao chưa được cấu hình tọa độ GPS.'
       );
     }
 
@@ -197,9 +269,10 @@ export async function POST(request: Request) {
     );
 
     if (distance > Number(matchedBranch.radius)) {
-      return NextResponse.json(
-        { error: `Vị trí sai! Bạn đang cách cơ sở khoảng ${Math.round(distance)} mét.` },
-        { status: 403 }
+      throw new StaffAttendanceError(
+        403,
+        'attendance_location_out_of_range',
+        `Vị trí sai. Bạn đang cách cơ sở khoảng ${Math.round(distance)} mét.`
       );
     }
 
@@ -207,7 +280,7 @@ export async function POST(request: Request) {
     const todayStr = formatBusinessDateInput(businessDateFromInstant(now));
     const timeStr = now.toLocaleTimeString('vi-VN', { hour12: false });
     const currentShift = autoDetectShift(now);
-    const openRecord = await getOpenAttendanceRecord(authContext.employee.id, todayStr);
+    const openRecord = await getOpenAttendanceRecord(authContext.employee.id);
     const supabase = await createClient();
 
     if (openRecord) {
@@ -229,6 +302,7 @@ export async function POST(request: Request) {
 
       return NextResponse.json({
         success: true,
+        code: 'attendance_checked_out',
         message: `Đã tan ca [${openRecord.shift_name}] thành công.`,
       });
     }
@@ -240,10 +314,11 @@ export async function POST(request: Request) {
     );
 
     if (existingShift) {
-      return NextResponse.json({
-        success: true,
-        message: `Ca [${currentShift}] đã có dữ liệu chấm công.`,
-      });
+      throw new StaffAttendanceError(
+        409,
+        'attendance_already_checked_out',
+        `Ca [${currentShift}] đã có dữ liệu chấm công.`
+      );
     }
 
     const { error } = await supabase.from('attendance').insert([
@@ -260,9 +335,10 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       success: true,
+      code: 'attendance_checked_in',
       message: `Đã ghi nhận [${currentShift}] lúc ${timeStr}.`,
     });
   } catch (error) {
-    return toErrorResponse(error);
+    return toStaffAttendanceErrorResponse(error);
   }
 }

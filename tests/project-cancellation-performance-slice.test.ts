@@ -91,6 +91,7 @@ describe('project list request waterfall guardrails', () => {
     const repository = source('services/repositories/workflowRepository.ts');
     const phaseMutations = source('services/server/phaseMutations.ts');
 
+    expect(repository).toMatch(/select\('id, project_name, drive_url, status, project_deadline, created_at'\)/);
     expect(repository).toMatch(/select\('id, project_name, drive_url, status, created_at'\)/);
     expect(repository).toMatch(/select\('id, project_name, assigned_to, current_phase, estimation_date, issue_note, packer_assigned, created_at'\)/);
     expect(phaseMutations).toMatch(/select\('id, project_id, name, order_index, created_at'\)/);

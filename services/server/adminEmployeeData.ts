@@ -267,7 +267,7 @@ export async function getAdminEmployeeListData(): Promise<AdminEmployeeListData>
         .from('employees')
         .select('id, full_name, title, email, status, is_active, auth_user_id, branch_code')
         .order('id', { ascending: false }),
-      supabase.from('facilities').select('id, name, facility_name, code'),
+      supabase.from('facilities').select('id, facility_name'),
       supabase
         .from('employee_workspace_access')
         .select('employee_id, workspace, status, revoked_at'),
@@ -336,7 +336,7 @@ export async function getAdminEmployeeDetailData(employeeId: string): Promise<Em
       .select('id, full_name, title, email, phone, status, is_active, auth_user_id, branch_code, hourly_rate, created_at')
       .eq('id', employeeId)
       .maybeSingle(),
-    supabase.from('facilities').select('id, name, facility_name, code'),
+    supabase.from('facilities').select('id, facility_name'),
     supabase
       .from('employee_workspace_access')
       .select('employee_id, workspace, status, revoked_at')

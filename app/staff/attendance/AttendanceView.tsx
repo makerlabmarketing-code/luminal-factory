@@ -1,6 +1,7 @@
 ﻿'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { useGlobalLoading } from '@/component/GlobalLoading';
 import { useNotification } from '@/component/NotificationContext';
 import MonthPicker from '@/component/MonthPicker';
 import { Power, RefreshCcw, AlertTriangle, CheckCircle2, Building2 } from 'lucide-react';
@@ -34,6 +35,11 @@ interface StaffAttendancePayload {
   attendanceHistory: AttendanceRecord[];
 }
 
+interface StaffAttendanceErrorPayload {
+  error?: string;
+  code?: string;
+}
+
 function isAttendanceRecordComplete(record: AttendanceRecord): boolean {
   return Boolean(record.check_in && record.check_out);
 }
@@ -51,11 +57,48 @@ function autoDetectShift(date: Date) {
   return 'Ca Tối';
 }
 
+function getCurrentPosition(): Promise<GeolocationPosition> {
+  return new Promise((resolve, reject) => {
+    navigator.geolocation.getCurrentPosition(resolve, reject, {
+      enableHighAccuracy: true,
+      timeout: 5000,
+    });
+  });
+}
+
+function isGeolocationError(error: unknown): error is GeolocationPositionError {
+  return Boolean(error && typeof error === 'object' && 'code' in error);
+}
+
+function messageForAttendanceError(payload: StaffAttendanceErrorPayload | null): string {
+  if (payload?.code === 'attendance_workspace_required') {
+    return 'Tài khoản chưa được cấp quyền vào khu vực nhân viên.';
+  }
+  if (payload?.code === 'attendance_employee_inactive') {
+    return 'Tài khoản nhân sự đã bị khóa.';
+  }
+  if (payload?.code === 'attendance_employee_not_found') {
+    return 'Tài khoản chưa được liên kết với hồ sơ nhân sự.';
+  }
+  if (payload?.code === 'attendance_invalid_payload') {
+    return payload.error || 'Dữ liệu chấm công không hợp lệ.';
+  }
+  if (payload?.code === 'attendance_location_out_of_range') {
+    return payload.error || 'Vị trí hiện tại nằm ngoài phạm vi chấm công.';
+  }
+  if (payload?.code === 'attendance_already_checked_out') {
+    return payload.error || 'Ca này đã có dữ liệu chấm công.';
+  }
+
+  return payload?.error || 'Không thể chấm công.';
+}
+
 export function StaffAttendanceContent({
   workerData,
   assignedBranchData,
 }: AttendanceViewProps) {
   const { showToast } = useNotification();
+  const { showGlobalLoading, hideGlobalLoading } = useGlobalLoading();
   const [worker, setWorker] = useState<Employee | null>(workerData || null);
   const [localBranchName, setLocalBranchName] = useState(
     assignedBranchData?.facility_name || assignedBranchData?.name || 'Đang nạp định vị...'
@@ -70,6 +113,7 @@ export function StaffAttendanceContent({
   const [historyPage, setHistoryPage] = useState(1);
   const [fetching, setFetching] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   const applyAttendancePayload = (payload: StaffAttendancePayload) => {
     setWorker(payload.employee);
@@ -112,6 +156,8 @@ export function StaffAttendanceContent({
   }, [loadAttendanceData]);
 
   const handleToggleShift = async () => {
+    if (submitting) return;
+
     if (!worker) {
       showToast('Lỗi', 'Không tìm thấy hồ sơ nhân sự!', 'error');
       return;
@@ -122,43 +168,38 @@ export function StaffAttendanceContent({
       return;
     }
 
+    setSubmitting(true);
+    showGlobalLoading(isInShift ? 'Đang kết thúc ca...' : 'Đang ghi nhận vào ca...');
+
     try {
-      navigator.geolocation.getCurrentPosition(
-        async (position) => {
-          try {
-            const userLat = position.coords.latitude;
-            const userLng = position.coords.longitude;
+      const position = await getCurrentPosition();
+      const userLat = position.coords.latitude;
+      const userLng = position.coords.longitude;
 
-            const response = await fetch('/api/staff/attendance', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ userLat, userLng }),
-            });
+      const response = await fetch('/api/staff/attendance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userLat, userLng }),
+      });
 
-            const result = (await response.json().catch(() => null)) as {
-              error?: string;
-              message?: string;
-            } | null;
+      const result = (await response.json().catch(() => null)) as
+        | (StaffAttendanceErrorPayload & { message?: string })
+        | null;
 
-            if (!response.ok) {
-              throw new Error(result?.error || 'Không thể chấm công.');
-            }
+      if (!response.ok) {
+        throw new Error(messageForAttendanceError(result));
+      }
 
-            showToast('Cập nhật ca làm', result?.message || 'Đã ghi nhận chấm công.', 'success');
-            await loadAttendanceData();
-          } catch (error) {
-            const message = error instanceof Error ? error.message : 'Không thể chấm công.';
-            showToast('Lỗi kết nối', message, 'error');
-          }
-        },
-        () => {
-          showToast('Quyền định vị', 'Vui lòng mở quyền truy cập vị trí GPS mức chính xác cao!', 'error');
-        },
-        { enableHighAccuracy: true, timeout: 5000 }
-      );
+      showToast('Cập nhật ca làm', result?.message || 'Đã ghi nhận chấm công.', 'success');
+      await loadAttendanceData();
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Không thể chấm công.';
+      const message = isGeolocationError(error)
+        ? 'Vui lòng mở quyền truy cập vị trí GPS mức chính xác cao!'
+        : error instanceof Error ? error.message : 'Không thể chấm công.';
       showToast('Lỗi kết nối', message, 'error');
+    } finally {
+      setSubmitting(false);
+      hideGlobalLoading();
     }
   };
 
@@ -250,14 +291,16 @@ export function StaffAttendanceContent({
 
       <button
         onClick={handleToggleShift}
-        className={`w-36 h-36 rounded-full border-4 font-black text-xs tracking-wider uppercase transition-all duration-300 transform hover:scale-105 shadow-2xl flex flex-col items-center justify-center gap-1.5 active:scale-95 cursor-pointer ${
+        disabled={submitting}
+        aria-busy={submitting}
+        className={`w-36 h-36 rounded-full border-4 font-black text-xs tracking-wider uppercase transition-all duration-300 transform hover:scale-105 shadow-2xl flex flex-col items-center justify-center gap-1.5 active:scale-95 disabled:pointer-events-none disabled:opacity-60 cursor-pointer ${
           isInShift
             ? 'bg-red-950/40 border-red-500 text-red-400'
             : 'bg-emerald-950/40 border-emerald-500 text-emerald-400'
         }`}
       >
         <Power className="w-7 h-7" />
-        <span>{isInShift ? 'TẮT MÁY VỀ' : 'VÀO CA MÁY'}</span>
+        <span>{submitting ? 'ĐANG GHI' : isInShift ? 'TẮT MÁY VỀ' : 'VÀO CA MÁY'}</span>
       </button>
 
       <span className="text-[9px] text-purple-400 font-mono text-center bg-slate-950 p-2 rounded-lg border border-slate-800 w-full">

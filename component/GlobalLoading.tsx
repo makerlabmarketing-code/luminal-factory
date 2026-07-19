@@ -21,7 +21,9 @@ export type GlobalLoadingMessage =
   | 'Đang đăng xuất...'
   | 'Đang tải dữ liệu...'
   | 'Đang lưu thay đổi...'
-  | 'Đang gửi lời mời...';
+  | 'Đang gửi lời mời...'
+  | 'Đang ghi nhận vào ca...'
+  | 'Đang kết thúc ca...';
 
 interface GlobalLoadingContextValue {
   showGlobalLoading: (message: GlobalLoadingMessage) => void;
