@@ -44,3 +44,23 @@ When creating or materially changing repository-owned guidance, consult:
     .agents/skills/writing-great-skills/SKILL.md
 
 Keep durable rules in one authoritative owner, use progressive disclosure for specialized reference material, and give workflow steps checkable completion criteria.
+
+## Git delivery policy
+
+For approved implementation tasks, Codex may automatically commit, push the feature branch, merge it into `main`, and push `main` only after all repository validation gates pass.
+
+Required gates:
+
+- npm test
+- npm run lint
+- npx tsc --noEmit
+- npm run build
+- no unresolved P0 or P1 findings
+- no secrets in the diff
+- no production SQL or unapproved migrations
+- no unrelated changes
+- validation must pass again after merging into main
+
+Never force-push, bypass branch protection, discard unknown changes, or resolve merge conflicts by guessing.
+
+If any gate fails, stop without pushing main and report the blocker.
