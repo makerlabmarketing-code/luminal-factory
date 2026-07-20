@@ -744,3 +744,4 @@ Phase Workflow Foundation Migration remains cho duyet.
 - Root notification and confirmation overlays remain portal-based and now use the explicit `z-index: 999999` requirement.
 - No schema migration, RLS mutation, production deployment, or project-code migration was run.
 - Next safe slice: Project Detail phase gating/status transition design and application implementation until a schema/RLS approval gate is reached.
+

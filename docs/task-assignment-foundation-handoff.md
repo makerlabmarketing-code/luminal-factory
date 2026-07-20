@@ -95,3 +95,4 @@ Phase 3 began with the project create reliability seam after Task Assignment val
 - Global toast and confirmation overlays use the root portal layer with `z-index: 999999`.
 
 Next Phase 3 slice: project detail phase gating/status transition design. Stop at `LIVE_APPROVAL_REQUIRED` if schema, RLS, or data mutation beyond approved application behavior is needed.
+
