@@ -56,7 +56,7 @@ describe('Task Assignment Foundation contracts', () => {
     expect(() => validateTaskAssignmentStatusPayload({ status: 'DONE' })).toThrow(TaskAssignmentValidationError);
   });
 
-  it('exposes route contracts but leaves writes behind the migration feature gate', () => {
+  it('exposes route contracts and keeps writes behind the migration feature gate', () => {
     const service = source('services/server/taskAssignmentFoundation.ts');
     const listRoute = source('app/api/admin/projects/[projectId]/tasks/route.ts');
     const patchRoute = source('app/api/admin/projects/[projectId]/tasks/[taskId]/route.ts');
@@ -65,10 +65,14 @@ describe('Task Assignment Foundation contracts', () => {
 
     expect(service).toMatch(/TASK_ASSIGNMENT_FOUNDATION_ENABLED/);
     expect(service).toMatch(/task_assignment_migration_required/);
-    expect(service).toMatch(/task_assignment_repository_not_implemented/);
-    expect(service).toMatch(/Task Assignment repository chưa được kết nối/);
-    expect(service).toMatch(/return assertTaskAssignmentRepositoryAvailable\(\)/);
-    expect(service).not.toMatch(/return \{ success: true/);
+    expect(service).toMatch(/createSupabaseAdminClient/);
+    expect(service).toMatch(/assertTaskSchemaReady/);
+    expect(service).toMatch(/task_assignment_migration_required/);
+    expect(service).toMatch(/Không thể tạo công việc dự án/);
+    expect(service).toMatch(/Không thể cập nhật công việc dự án/);
+    expect(service).toMatch(/Không thể giao công việc dự án/);
+    expect(service).toMatch(/Không thể đổi trạng thái công việc dự án/);
+    expect(service).not.toMatch(/task_assignment_repository_not_implemented/);
     expect(service).toMatch(/requireProjectMembershipAction\(projectId, 'TASK_MANAGE'\)/);
     expect(listRoute).toMatch(/export async function GET/);
     expect(listRoute).toMatch(/export async function POST/);
