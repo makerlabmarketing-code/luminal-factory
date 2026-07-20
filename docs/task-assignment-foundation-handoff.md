@@ -69,3 +69,17 @@ Prepared but not enabled:
 - draft forward, rollback, validation SQL and backfill strategy under `supabase/drafts/20260720_task_assignment_foundation_*`.
 
 No SQL was executed. No task rows were reassigned. No live data was mutated. Phase 2 remains blocked at `LIVE_APPROVAL_REQUIRED` until the migration package and backfill strategy are approved.
+
+## 2026-07-20 live migration, repair, and repository wiring
+
+Completed with live approval through the Supabase Management API over HTTPS:
+
+- Applied the reviewed Task Assignment Foundation forward migration.
+- Backfilled deterministic normalized fields only.
+- Removed obsolete trial legacy task rows `1` and `2` after destructive repair approval and dependency inspection.
+- Re-ran the complete Task Assignment validation package: schema, constraints, indexes, helper functions, RLS, read policies, browser-write-policy absence, FK/orphan checks, hierarchy checks, membership checks, and incomplete-backfill indicators all passed.
+- Wired server Task Assignment persistence for list, create, update, assign, and status operations.
+- Preserved the `TASK_ASSIGNMENT_FOUNDATION_ENABLED` migration gate so real persistence is enabled only by deployment/runtime configuration after validation.
+- Preserved fake-success protection: API mutations return success only after Supabase persistence, comment/activity/notification side effects, and task reload succeed.
+
+Rollback note: do not roll back the successful schema migration automatically. Rollback remains the reviewed SQL artifact and requires separate approval because live schema/data has changed.
