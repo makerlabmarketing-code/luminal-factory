@@ -150,3 +150,18 @@ Completed an application-only UI polish slice:
 - Added static regression coverage for the route loading file and inline loading accessibility markers.
 
 No SQL was executed. No schema, RLS, backfill, RPC, feature flag, deployment, or live data mutation was performed. Phase 3 phase status/dependency persistence remains blocked at `LIVE_APPROVAL_REQUIRED` until explicit live approval is granted.
+
+## 2026-07-21 Review debt remediation sweep
+
+Completed application-only remediation for actionable task-assignment review debt that was still present on the current branch:
+
+- Task employee embeds now disambiguate the `tasks.assignee_employee_id -> employees.id` foreign key in task list/load selects.
+- Assignment validation now distinguishes omitted `assigneeEmployeeId` from explicit `null` so malformed assignment payloads cannot silently clear the assignee.
+- Assignee eligibility now requires ACTIVE project membership and an eligible employee row that is not inactive, locked, disabled, deleted, or `is_active = false`.
+- Parent task changes now reject self-parenting and direct or indirect cycles while loading ancestors inside the same project boundary.
+- Status changes now load the persisted status and validate the requested transition through the canonical task transition map before writing.
+- Empty task updates now fail before writing audit fields or emitting `TASK_UPDATED` activity.
+- Task creation no longer performs a non-atomic partial-write sequence. The current application path stops with `task_assignment_atomic_create_required` until the reviewed transactional RPC is approved and deployed.
+- Draft-only RPC artifact prepared at `supabase/drafts/20260721_task_assignment_atomic_create_rpc.sql`; no SQL, migration, RLS, grant, backfill, or live data mutation was run.
+
+Current gate: `LIVE_APPROVAL_REQUIRED` before creating/deploying the atomic task-create RPC or granting execute access.
