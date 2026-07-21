@@ -138,3 +138,15 @@ Prepared but did not run the next Phase 3 persistence package:
 - Preserved the current role matrix: `CREATIVE_LEAD` remains view-only unless an approved role change is made later.
 
 No SQL was executed. No schema, RLS, role matrix, deployment, or live data mutation was performed. The next step is `LIVE_APPROVAL_REQUIRED` for review/approval before any phase status/dependency migration, RLS change, backfill, or production data mutation.
+
+## 2026-07-21 Phase 4 project detail loading-state polish
+
+Continued from the latest main branch after the gated Phase 3 persistence planning/application work reached `LIVE_APPROVAL_REQUIRED`.
+
+Completed an application-only UI polish slice:
+
+- Added a Project Detail route-level loading skeleton for Next.js route transitions.
+- Replaced the Project Detail client refresh loading state with a layout-matching skeleton that preserves the header, KPI, workflow/member, and sidebar structure while data is loading.
+- Added static regression coverage for the route loading file and inline loading accessibility markers.
+
+No SQL was executed. No schema, RLS, backfill, RPC, feature flag, deployment, or live data mutation was performed. Phase 3 phase status/dependency persistence remains blocked at `LIVE_APPROVAL_REQUIRED` until explicit live approval is granted.

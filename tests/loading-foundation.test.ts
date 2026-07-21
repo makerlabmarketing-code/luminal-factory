@@ -87,6 +87,19 @@ describe('global loading foundation', () => {
     expect(capitalSource).toMatch(/: loadError \? \(/);
   });
 
+
+  it('uses a layout-matching loading state for project detail route and refreshes', () => {
+    const projectLoadingSource = source('app/admin/projects/[projectId]/loading.tsx');
+    const projectDetailSource = source('app/admin/projects/[projectId]/page.tsx');
+
+    expect(projectLoadingSource).toMatch(/Đang tải chi tiết dự án/);
+    expect(projectLoadingSource).toMatch(/lg:grid-cols-\[1fr_320px\]/);
+    expect(projectLoadingSource).toMatch(/animate-pulse/);
+    expect(projectDetailSource).toMatch(/aria-busy="true"/);
+    expect(projectDetailSource).toMatch(/Đang tải chi tiết dự án\.\.\./);
+    expect(projectDetailSource).toMatch(/lg:grid-cols-\[1fr_320px\]/);
+  });
+
   it('uses button/action loading for employee account actions', () => {
     const employeeClientSource = source('app/admin/employees/AdminEmployeesClient.tsx');
 

@@ -695,12 +695,28 @@ export default function ProjectDetailPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-950 p-4 text-slate-100 sm:p-6">
-        <div className="mx-auto max-w-7xl space-y-5">
-          <div className="h-16 animate-pulse rounded-lg bg-slate-900" />
-          <div className="h-28 animate-pulse rounded-lg bg-slate-900" />
-          <div className="h-40 animate-pulse rounded-lg bg-slate-900" />
+        <div className="mx-auto max-w-7xl space-y-5" aria-busy="true" aria-label="Đang tải chi tiết dự án">
+          <div className="flex flex-col gap-3 border-b border-slate-800 pb-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="space-y-3">
+              <div className="h-4 w-36 animate-pulse rounded bg-slate-800" />
+              <div className="h-7 w-72 animate-pulse rounded bg-slate-800" />
+              <div className="h-4 w-56 animate-pulse rounded bg-slate-900" />
+            </div>
+            <div className="flex gap-2">
+              <div className="h-9 w-32 animate-pulse rounded-lg border border-slate-800 bg-slate-900" />
+              <div className="h-9 w-28 animate-pulse rounded-lg border border-slate-800 bg-slate-900" />
+            </div>
+          </div>
+          <div className="h-28 animate-pulse rounded-lg border border-slate-800 bg-slate-900" />
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_320px]">
+            <div className="space-y-4">
+              <div className="h-44 animate-pulse rounded-lg border border-slate-800 bg-slate-900" />
+              <div className="h-56 animate-pulse rounded-lg border border-slate-800 bg-slate-900" />
+            </div>
+            <div className="h-64 animate-pulse rounded-lg border border-slate-800 bg-slate-900" />
+          </div>
           <div className="flex items-center justify-center gap-2 text-xs text-slate-400">
-            <Clock className="h-4 w-4 animate-spin" /> Đang tải dự án...
+            <Clock className="h-4 w-4 animate-spin" /> Đang tải chi tiết dự án...
           </div>
         </div>
       </div>

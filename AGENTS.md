@@ -294,6 +294,17 @@ Required gates:
 - npm run lint
 - npx tsc --noEmit
 - npm run build
+
+### Test Command Policy
+
+This repository uses Vitest. The full test command is:
+
+```
+npm test
+```
+
+Targeted tests must use repository-supported Vitest syntax, such as passing a test file path or Vitest-supported filter through npm. Jest-only flags such as `--runInBand` must not be used. Unsupported test-runner flags are tooling-command failures, not implementation failures.
+
 - no unresolved P0 or P1 findings
 - no secrets in the diff
 - no production SQL
