@@ -98,11 +98,14 @@ describe('Task Assignment Foundation contracts', () => {
     expect(service).toMatch(/employeeStatus === "INACTIVE"/);
     expect(service).toMatch(/employeeStatus === "LOCKED"/);
     expect(service).toMatch(/task_assignment_parent_cycle/);
-    expect(service).toMatch(/task_assignment_noop_update/);
+    expect(service).toMatch(/changedFields.length === 0/);
+    expect(service).toMatch(/currentTask.status === payload.status/);
     expect(service).toMatch(/TASK_UPDATED/);
     expect(service).toMatch(/STATUS_CHANGED/);
     expect(service).toMatch(/oldStatus/);
     expect(service).toMatch(/newStatus/);
+    expect(source('lib/workflow-project-phase.ts')).toMatch(/task-status-transitions/);
+    expect(source('services/taskAssignmentFoundation.ts')).toMatch(/task-status-transitions/);
   });
 
   it('wires project detail to normalized task assignment without extra employee-list fetches', () => {

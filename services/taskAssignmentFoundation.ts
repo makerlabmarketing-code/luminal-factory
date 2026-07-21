@@ -5,6 +5,7 @@ import type {
   TaskAssignmentStatusPayload,
   TaskAssignmentUpdatePayload,
 } from "@/lib/types/task-assignment";
+import { TASK_STATUS_TRANSITIONS, canTransitionTaskStatus } from "../lib/task-status-transitions";
 
 export type TaskAssignmentAction =
   | "TASK_LIST"
@@ -67,29 +68,7 @@ export const TASK_ASSIGNMENT_STATUS_KEYS = new Set([
   "comment",
 ]);
 
-export const TASK_ASSIGNMENT_NORMAL_TRANSITIONS: Readonly<
-  Record<TaskAssignmentStatus, readonly TaskAssignmentStatus[]>
-> = {
-  BACKLOG: ["READY", "CANCELLED"],
-  READY: ["IN_PROGRESS", "BACKLOG", "CANCELLED"],
-  IN_PROGRESS: ["PENDING_REVIEW", "BLOCKED", "ON_HOLD", "CANCELLED"],
-  PENDING_REVIEW: ["APPROVED", "REVISION_REQUIRED", "CANCELLED"],
-  REVISION_REQUIRED: ["IN_PROGRESS", "CANCELLED"],
-  APPROVED: ["COMPLETED"],
-  BLOCKED: ["IN_PROGRESS", "CANCELLED"],
-  ON_HOLD: ["READY", "CANCELLED"],
-  COMPLETED: [],
-  CANCELLED: [],
-};
-
-export function canTransitionTaskStatus(
-  fromStatus: TaskAssignmentStatus,
-  toStatus: TaskAssignmentStatus,
-): boolean {
-  if (fromStatus === toStatus) return true;
-  return TASK_ASSIGNMENT_NORMAL_TRANSITIONS[fromStatus].includes(toStatus);
-}
-
+export { TASK_STATUS_TRANSITIONS as TASK_ASSIGNMENT_NORMAL_TRANSITIONS, canTransitionTaskStatus };
 const STATUS_SET = new Set<string>(TASK_ASSIGNMENT_STATUSES);
 
 function assertKnownFields(

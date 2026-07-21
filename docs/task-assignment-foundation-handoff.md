@@ -165,3 +165,13 @@ Completed application-only remediation for actionable task-assignment review deb
 - Draft-only RPC artifact prepared at `supabase/drafts/20260721_task_assignment_atomic_create_rpc.sql`; no SQL, migration, RLS, grant, backfill, or live data mutation was run.
 
 Current gate: `LIVE_APPROVAL_REQUIRED` before creating/deploying the atomic task-create RPC or granting execute access.
+
+### 2026-07-21 inline review follow-up
+
+Resolved follow-up review comments from the remediation PR:
+
+- Unchanged task PATCH/assign/status calls are now idempotent and do not write audit fields or emit update/status/assignment activity for no-op saves.
+- Project Detail task status options now use the same shared task transition source as the server validator.
+- Project member DTOs now expose assignability based on ACTIVE membership plus employee eligibility, and Project Detail filters assignee options by that flag.
+
+No SQL, migration, RLS, grant, backfill, RPC execution, or live data mutation was run.

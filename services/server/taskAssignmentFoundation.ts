@@ -578,13 +578,9 @@ export async function updateProjectTask(
   const changedFields = Object.keys(updatePayload).filter(
     (key) => !["updated_by_employee_id", "updated_at"].includes(key),
   );
-  if (changedFields.length === 0 && !payload.comment) {
-    throw taskAssignmentError(
-      422,
-      "Không có nội dung công việc nào cần cập nhật.",
-      "task_assignment_noop_update",
-      "payload_validation",
-    );
+  if (changedFields.length === 0) {
+    await insertComment(projectId, taskId, context.actorEmployeeId, payload.comment);
+    return { success: true, task: await loadTask(projectId, taskId) };
   }
 
   const supabase = createSupabaseAdminClient();
@@ -626,8 +622,12 @@ export async function assignProjectTask(
   const taskId = parseTaskAssignmentTaskId(rawTaskId);
   const payload = validateTaskAssignmentAssignPayload(body);
   const context = await contextForMutation(projectId);
-  await assertTaskBelongsToProject(projectId, taskId);
+  const currentTask = await loadTask(projectId, taskId);
   await assertAssigneeActiveMember(projectId, payload.assigneeEmployeeId);
+  if (currentTask.assigneeEmployeeId === payload.assigneeEmployeeId) {
+    await insertComment(projectId, taskId, context.actorEmployeeId, payload.comment);
+    return { success: true, task: await loadTask(projectId, taskId) };
+  }
 
   const supabase = createSupabaseAdminClient();
   const { error } = await supabase
@@ -689,13 +689,9 @@ export async function changeProjectTaskStatus(
       { from_status: currentTask.status, to_status: payload.status },
     );
   }
-  if (currentTask.status === payload.status && !payload.comment) {
-    throw taskAssignmentError(
-      422,
-      "Trạng thái công việc không thay đổi.",
-      "task_assignment_status_noop",
-      "payload_validation",
-    );
+  if (currentTask.status === payload.status) {
+    await insertComment(projectId, taskId, context.actorEmployeeId, payload.comment);
+    return { success: true, task: await loadTask(projectId, taskId) };
   }
 
   const supabase = createSupabaseAdminClient();
