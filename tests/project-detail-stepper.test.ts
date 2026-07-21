@@ -58,6 +58,19 @@ describe('project detail stepper and task assignee display', () => {
     expect(detailPage).not.toMatch(/Timeline giai đoạn/);
   });
 
+  it('keeps phase detail and task cards responsive without duplicating business logic', () => {
+    const detailPage = source('app/admin/projects/[projectId]/page.tsx');
+
+    expect(detailPage).toMatch(/function ProjectDetailField/);
+    expect(detailPage).toMatch(/function TaskMobileField/);
+    expect(detailPage).toMatch(/xl:grid-cols-\[minmax\(0,1fr\)_360px\]/);
+    expect(detailPage).toMatch(/xl:sticky xl:top-4 xl:self-start/);
+    expect(detailPage).toMatch(/<dl className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-2 xl:grid-cols-4">/);
+    expect(detailPage).toMatch(/<article key=\{getTaskKey\(task\)\}/);
+    expect(detailPage).toMatch(/<TaskMobileField label="Người phụ trách" value=\{getTaskAssigneeLabel\(task\)\} \/>/);
+    expect(detailPage).toMatch(/className="mt-3 w-full rounded border border-slate-700 px-2 py-2 font-bold text-slate-300"/);
+  });
+
   it('renders task assignee and packer text through explicit helper fallbacks', () => {
     const detailPage = source('app/admin/projects/[projectId]/page.tsx');
 

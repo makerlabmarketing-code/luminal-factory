@@ -217,3 +217,18 @@ Completed:
 No SQL was executed. No schema, RLS, backfill, RPC, grant, feature-flag enablement, deployment, destructive operation, or live data mutation was performed by this slice.
 
 Current gate remains `LIVE_APPROVAL_REQUIRED` before deploying the task-create RPC, grants, phase status/dependency schema/RLS, backfill, or any live mutation.
+
+## 2026-07-21 Phase 4 project detail responsive consistency
+
+Continued Phase 4 with an application-only responsive/detail consistency slice while Phase 3 phase status/dependency persistence and task-create RPC remain at `LIVE_APPROVAL_REQUIRED`.
+
+Completed:
+
+- Project Detail now keeps the main/detail layout as one column through tablet widths and moves the summary sidebar to a sticky desktop rail only at the XL breakpoint.
+- Selected phase metadata uses reusable field cards so deadline, owner, progress, and latest activity present consistently across responsive widths.
+- Mobile task rendering now uses semantic task cards with `article`/`dl`, scan-level status, compact labels, and a full-width edit action for touch usability.
+- Removed a duplicate `getTaskStatusValue` declaration while preserving the existing task status fallback behavior.
+
+No SQL was executed. No schema, RLS, backfill, RPC, grant, feature-flag enablement, deployment, destructive operation, or live data mutation was performed by this slice.
+
+Current gate remains `LIVE_APPROVAL_REQUIRED` before deploying the task-create RPC, grants, phase status/dependency schema/RLS, backfill, or any live mutation.
