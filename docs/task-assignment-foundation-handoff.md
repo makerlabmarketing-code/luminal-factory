@@ -175,3 +175,16 @@ Resolved follow-up review comments from the remediation PR:
 - Project member DTOs now expose assignability based on ACTIVE membership plus employee eligibility, and Project Detail filters assignee options by that flag.
 
 No SQL, migration, RLS, grant, backfill, RPC execution, or live data mutation was run.
+
+## 2026-07-21 Phase 4 project detail empty/error state polish
+
+Continued Phase 4 with an application-only shared state-pattern slice while Phase 3 persistence and the task-create RPC remain at `LIVE_APPROVAL_REQUIRED`.
+
+- Added a reusable `OperationalState` presentation component for Project Detail empty and error states.
+- Replaced the Project Detail load failure panel, no-phase state, no-member state, and selected-phase no-task state with the shared pattern.
+- Preserved server authorization, project/task business logic, feature gates, workflow transitions, and live data behavior.
+- Added static regression coverage for the shared state component, Vietnamese copy, retry action, and Project Detail adoption.
+
+No SQL was executed. No schema, RLS, backfill, RPC, feature flag enablement, deployment, or live data mutation was performed.
+
+Current gate: `LIVE_APPROVAL_REQUIRED` before deploying the task-create RPC, grants, phase status/dependency schema/RLS, backfill, or any live mutation.
