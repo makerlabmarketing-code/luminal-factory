@@ -358,6 +358,16 @@ Stop and report only when:
 
 After the pull request is merged, future roadmap work must continue from the latest `main` branch.
 
+### Review Source Policy
+
+When pull request review conversations are not available inside the active Codex Cloud task:
+
+- report REVIEW_SOURCE_UNAVAILABLE
+- do not guess comment contents
+- do not block unrelated implementation solely because old comments cannot be retrieved
+- instruct the operator to invoke `@codex` in the relevant GitHub pull request or provide the review findings in the task
+- remediate merged-PR findings through a new review-debt pull request from latest main
+
 ### Pull Request Review Comment Policy
 
 A pull request is not delivery-complete while actionable review conversations remain unresolved.
