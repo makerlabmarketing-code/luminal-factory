@@ -97,7 +97,7 @@ describe('global loading foundation', () => {
     expect(projectLoadingSource).toMatch(/animate-pulse/);
     expect(projectDetailSource).toMatch(/aria-busy="true"/);
     expect(projectDetailSource).toMatch(/Đang tải chi tiết dự án\.\.\./);
-    expect(projectDetailSource).toMatch(/lg:grid-cols-\[1fr_320px\]/);
+    expect(projectDetailSource).toMatch(/xl:grid-cols-\[minmax\(0,1fr\)_360px\]/);
   });
 
   it('uses button/action loading for employee account actions', () => {

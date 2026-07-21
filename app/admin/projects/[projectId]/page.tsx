@@ -288,6 +288,24 @@ function canShowManualUnlockAction(canManageProject: boolean, phase: PhaseRecord
   return canManageProject && phase.status === 'LOCKED';
 }
 
+function ProjectDetailField({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div className="rounded-lg border border-slate-800 bg-slate-950/70 p-3">
+      <dt className="text-[11px] font-bold text-slate-500">{label}</dt>
+      <dd className="mt-1 break-words text-sm font-bold text-slate-100">{value}</dd>
+    </div>
+  );
+}
+
+function TaskMobileField({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="text-[10px] font-bold text-slate-500">{label}</dt>
+      <dd className="mt-0.5 break-words text-xs text-slate-300">{value}</dd>
+    </div>
+  );
+}
+
 export default function ProjectDetailPage() {
   const params = useParams<{ projectId: string }>();
   const router = useRouter();
@@ -722,7 +740,7 @@ export default function ProjectDetailPage() {
             </div>
           </div>
           <div className="h-28 animate-pulse rounded-lg border border-slate-800 bg-slate-900" />
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_320px]">
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
             <div className="space-y-4">
               <div className="h-44 animate-pulse rounded-lg border border-slate-800 bg-slate-900" />
               <div className="h-56 animate-pulse rounded-lg border border-slate-800 bg-slate-900" />
@@ -821,7 +839,7 @@ export default function ProjectDetailPage() {
           </section>
         )}
 
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_320px]">
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
           <div className="space-y-4">
             <section className="rounded-lg border border-slate-800 bg-slate-900">
               <div className="border-b border-slate-800 px-4 py-3">
@@ -979,24 +997,12 @@ export default function ProjectDetailPage() {
                     Công việc con dùng Task Assignment Foundation khi đã bật migration gate. Nếu chưa bật, màn hình giữ dữ liệu legacy ở chế độ chỉ xem.
                   </div>
 
-                  <div className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-2 lg:grid-cols-4">
-                    <div>
-                      <p className="text-slate-500">Deadline</p>
-                      <p className="font-bold text-slate-100">{formatDate(selectedPhase.description.stage_deadline || selectedPhase.description.project_deadline)}</p>
-                    </div>
-                    <div>
-                      <p className="text-slate-500">Người phụ trách phase</p>
-                      <p className="font-bold text-slate-100">{selectedPhase.description.stage_owner || 'Chưa gán'}</p>
-                    </div>
-                    <div>
-                      <p className="text-slate-500">Tiến độ phase</p>
-                      <p className="font-bold text-slate-100">{selectedPhase.progressPercent}% · {selectedPhase.completedTaskCount}/{selectedPhase.taskCount} công việc</p>
-                    </div>
-                    <div>
-                      <p className="text-slate-500">Hoạt động gần nhất</p>
-                      <p className="font-bold text-slate-100">{formatDateTime(selectedPhase.lastActivityAt)}</p>
-                    </div>
-                  </div>
+                  <dl className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-2 xl:grid-cols-4">
+                    <ProjectDetailField label="Deadline" value={formatDate(selectedPhase.description.stage_deadline || selectedPhase.description.project_deadline)} />
+                    <ProjectDetailField label="Người phụ trách phase" value={selectedPhase.description.stage_owner || 'Chưa gán'} />
+                    <ProjectDetailField label="Tiến độ phase" value={`${selectedPhase.progressPercent}% · ${selectedPhase.completedTaskCount}/${selectedPhase.taskCount} công việc`} />
+                    <ProjectDetailField label="Hoạt động gần nhất" value={formatDateTime(selectedPhase.lastActivityAt)} />
+                  </dl>
 
                   <div className="rounded-lg border border-slate-800 bg-slate-950 p-3 text-xs text-slate-400">
                     {selectedPhase.description.next_action || selectedPhase.description.stage_type || 'Chưa có mô tả giai đoạn.'}
@@ -1037,22 +1043,24 @@ export default function ProjectDetailPage() {
                     </table>
                     <div className="space-y-3 md:hidden">
                       {selectedPhase.tasks.map((task) => (
-                        <div key={getTaskKey(task)} className="rounded-lg border border-slate-800 bg-slate-950 p-3 text-xs">
-                          <p className="font-bold text-slate-100">{getTaskTitle(task)}</p>
-                          <div className="mt-2 space-y-1 text-slate-400">
-                            <p>Người phụ trách: {getTaskAssigneeLabel(task)}</p>
-                            <p>Người đóng gói: {getTaskPackerLabel(task) || 'Chưa gán'}</p>
-                            <p>Deadline: {getTaskDeadlineLabel(task)}</p>
-                            <p>Trạng thái: {taskStatusLabel(getTaskStatusValue(task))}</p>
-                            <p>Tiến độ: {getTaskProgressLabel(task)}</p>
-                            <p>Bình luận: {getTaskCommentLabel(task)}</p>
+                        <article key={getTaskKey(task)} className="rounded-lg border border-slate-800 bg-slate-950 p-3 text-xs">
+                          <div className="flex items-start justify-between gap-3">
+                            <h3 className="font-bold text-slate-100">{getTaskTitle(task)}</h3>
+                            <span className="shrink-0 rounded border border-slate-700 px-2 py-0.5 text-[10px] text-slate-300">{taskStatusLabel(getTaskStatusValue(task))}</span>
                           </div>
+                          <dl className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                            <TaskMobileField label="Người phụ trách" value={getTaskAssigneeLabel(task)} />
+                            <TaskMobileField label="Người đóng gói" value={getTaskPackerLabel(task) || 'Chưa gán'} />
+                            <TaskMobileField label="Deadline" value={getTaskDeadlineLabel(task)} />
+                            <TaskMobileField label="Tiến độ" value={getTaskProgressLabel(task)} />
+                            <TaskMobileField label="Bình luận" value={getTaskCommentLabel(task)} />
+                          </dl>
                           {isTaskAssignmentDTO(task) && canManageTasks && (
-                            <button type="button" onClick={() => handleStartEditTask(task)} className="mt-3 rounded border border-slate-700 px-2 py-1 font-bold text-slate-300">
+                            <button type="button" onClick={() => handleStartEditTask(task)} className="mt-3 w-full rounded border border-slate-700 px-2 py-2 font-bold text-slate-300">
                               Sửa
                             </button>
                           )}
-                        </div>
+                        </article>
                       ))}
                     </div>
                     {selectedPhase.tasks.length === 0 && (
@@ -1094,10 +1102,10 @@ export default function ProjectDetailPage() {
             )}
           </div>
 
-          <aside className="space-y-4">
+          <aside className="space-y-4 xl:sticky xl:top-4 xl:self-start">
             <section className="rounded-lg border border-slate-800 bg-slate-900 p-4">
               <h2 className="text-sm font-black text-slate-100">Thông tin dự án</h2>
-              <div className="mt-3 space-y-3 text-xs">
+              <dl className="mt-3 grid grid-cols-1 gap-3 text-xs sm:grid-cols-2 xl:grid-cols-1">
                 <div>
                   <p className="text-slate-500">Deadline tổng</p>
                   <p className="text-slate-100">{formatDate(firstDescription.project_deadline)}</p>
@@ -1119,7 +1127,7 @@ export default function ProjectDetailPage() {
                   <input disabled={!canManageProject} value={driveLinkInput} onChange={(event) => setDriveLinkInput(event.target.value)} className="w-full rounded border border-slate-800 bg-slate-950 px-3 py-2 text-xs outline-none disabled:cursor-not-allowed disabled:opacity-60" placeholder="Nhập link Drive" />
                   <button disabled={!canManageProject} onClick={handleSaveDriveLink} className="w-full rounded bg-cyan-600 px-3 py-2 text-xs font-bold text-white disabled:cursor-not-allowed disabled:bg-slate-800 disabled:text-slate-500">Lưu thông tin</button>
                 </div>
-              </div>
+              </dl>
             </section>
 
             <section className="rounded-lg border border-amber-900 bg-amber-950/20 p-4 text-xs text-amber-100">
