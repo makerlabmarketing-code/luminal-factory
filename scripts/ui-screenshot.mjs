@@ -7,6 +7,10 @@ import {
   defaultBaseUrl,
   defaultOutputDir,
   defaultReadySelector,
+  getStorageStatePathForRole,
+  isMutationRoute,
+  resolveRoutePath,
+  screenshotRoles,
   screenshotRoutes,
   screenshotViewports,
 } from './ui-screenshot-config.mjs';
@@ -18,12 +22,18 @@ const require = createRequire(import.meta.url);
 const shouldStartServer = args.has('--start-server');
 const verifyOnly = args.has('--verify');
 const includeAuthenticated = args.has('--include-authenticated') || process.env.UI_SCREENSHOT_INCLUDE_AUTHENTICATED === '1';
+const selectedRole = valueFor('--role') || process.env.UI_SCREENSHOT_ROLE;
 const baseUrl = process.env.UI_SCREENSHOT_BASE_URL || defaultBaseUrl;
 const outputDir = process.env.UI_SCREENSHOT_DIR || defaultOutputDir;
 const readySelector = process.env.UI_SCREENSHOT_READY_SELECTOR || defaultReadySelector;
 const storageState = process.env.UI_SCREENSHOT_STORAGE_STATE;
 const selectedRouteNames = valuesFor('--route');
 const selectedViewportNames = valuesFor('--viewport');
+
+function valueFor(flag) {
+  const index = rawArgs.indexOf(flag);
+  return index === -1 ? undefined : rawArgs[index + 1];
+}
 
 function valuesFor(flag) {
   return rawArgs
@@ -47,25 +57,48 @@ async function loadPlaywright() {
   return import('playwright');
 }
 
-async function ensureStorageStateIfProvided() {
-  if (!storageState) return undefined;
+function requireRole() {
+  if (!selectedRole) return undefined;
+  if (!screenshotRoles[selectedRole]) {
+    console.error(`UI_SCREENSHOT_ROLE_UNKNOWN: Unsupported role: ${selectedRole}.`);
+    console.error(`Supported roles: ${Object.keys(screenshotRoles).join(', ')}`);
+    process.exit(8);
+  }
+  return selectedRole;
+}
+
+async function ensureStorageStateForRole(role) {
+  if (!role) return undefined;
+  const storageStatePath = storageState || getStorageStatePathForRole(role);
+  if (!storageStatePath?.startsWith('.auth/storage-state.')) {
+    console.error('UI_SCREENSHOT_AUTH_STATE_UNSAFE: Authenticated storage state must be under .auth/storage-state.<role>.json.');
+    process.exit(9);
+  }
   try {
-    await access(storageState);
-    return storageState;
+    await access(storageStatePath);
+    return storageStatePath;
   } catch {
-    console.error(`UI_SCREENSHOT_AUTH_STATE_MISSING: Không tìm thấy storage state tại ${storageState}.`);
-    console.error('Create it locally with the documented manual-auth workflow, or unset UI_SCREENSHOT_STORAGE_STATE.');
+    console.error(`UI_SCREENSHOT_AUTH_STATE_MISSING: Missing ${role} storage state at ${storageStatePath}.`);
+    console.error(`Run npm run ui:auth:setup -- --role ${role} with dedicated visual-QA credentials.`);
     process.exit(5);
   }
 }
 
-function selectedRoutes() {
+function selectedRoutes(role) {
   const routes = selectedRouteNames.length
     ? screenshotRoutes.filter((route) => selectedRouteNames.includes(route.name) || selectedRouteNames.includes(route.path))
     : screenshotRoutes;
 
-  const captureRoutes = routes.filter((route) => !route.requiresAuth || includeAuthenticated || storageState);
-  const skippedAuthRoutes = routes.filter((route) => route.requiresAuth && !includeAuthenticated && !storageState);
+  for (const requestedRoute of selectedRouteNames) {
+    if (isMutationRoute(requestedRoute)) {
+      console.error(`UI_SCREENSHOT_MUTATION_ROUTE_REJECTED: Refusing to capture mutation-capable route ${requestedRoute}.`);
+      process.exit(10);
+    }
+  }
+
+  const roleRoutes = role ? routes.filter((route) => !route.role || route.role === role) : routes;
+  const captureRoutes = roleRoutes.filter((route) => !route.requiresAuth || includeAuthenticated || role);
+  const skippedAuthRoutes = roleRoutes.filter((route) => route.requiresAuth && !includeAuthenticated && !role);
 
   if (selectedRouteNames.length && captureRoutes.length === 0) {
     console.error(`UI_SCREENSHOT_ROUTE_UNAVAILABLE: No requested route can be captured: ${selectedRouteNames.join(', ')}`);
@@ -77,7 +110,15 @@ function selectedRoutes() {
     console.warn(`UI_SCREENSHOT_AUTH_REQUIRED: Skipping ${route.name} (${route.path}); provide UI_SCREENSHOT_STORAGE_STATE or --include-authenticated to use an existing session.`);
   }
 
-  return captureRoutes;
+  return captureRoutes
+    .map((route) => ({ ...route, resolvedPath: resolveRoutePath(route) }))
+    .filter((route) => {
+      if (route.fixtureEnv && !route.resolvedPath) {
+        console.warn(`UI_SCREENSHOT_FIXTURE_MISSING: Skipping ${route.name}; set ${route.fixtureEnv} to an approved read-only fixture ID.`);
+        return false;
+      }
+      return true;
+    });
 }
 
 function selectedViewports() {
@@ -108,6 +149,20 @@ async function waitForServer(url) {
   process.exit(3);
 }
 
+async function verifyAuthenticatedWorkspace(page, role) {
+  const path = new URL(page.url()).pathname;
+  if (path.startsWith('/admin') && role === 'admin') return;
+  if (path.startsWith('/staff') && role === 'staff') return;
+  const bodyText = await page.locator('body').innerText({ timeout: 5_000 }).catch(() => '');
+  if (path.startsWith('/admin') || /Đăng nhập ERP|Vui lòng đăng nhập/.test(bodyText)) {
+    throw new Error(`UI_SCREENSHOT_LOGIN_REDIRECT: Auth state was rejected for ${role}; regenerate it with ui:auth:setup.`);
+  }
+  if (/chưa được cấp quyền truy cập|access denied|forbidden/i.test(bodyText)) {
+    throw new Error(`UI_SCREENSHOT_ACCESS_DENIED: Authenticated account cannot access requested ${role} workspace.`);
+  }
+  throw new Error(`UI_SCREENSHOT_ROLE_MISMATCH: Expected ${role} workspace but opened ${path}.`);
+}
+
 async function main() {
   if (args.has('--help')) {
     printUsage();
@@ -115,8 +170,9 @@ async function main() {
   }
 
   const playwright = await loadPlaywright();
-  const storageStatePath = await ensureStorageStateIfProvided();
-  const routes = selectedRoutes();
+  const role = requireRole();
+  const storageStatePath = await ensureStorageStateForRole(role);
+  const routes = selectedRoutes(role);
   const viewports = selectedViewports();
   let devServer;
   let browser;
@@ -143,10 +199,11 @@ async function main() {
       const page = await context.newPage();
 
       for (const route of routes) {
-        const url = new URL(route.path, baseUrl).toString();
+        const url = new URL(route.resolvedPath || route.path, baseUrl).toString();
         await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30_000 });
         await page.waitForLoadState('networkidle', { timeout: 30_000 }).catch(() => undefined);
         await page.locator(readySelector).first().waitFor({ state: 'visible', timeout: 15_000 });
+        if (route.requiresAuth) await verifyAuthenticatedWorkspace(page, route.role);
 
         if (!verifyOnly) {
           await page.screenshot({ path: `${outputDir}/${route.name}-${viewport.name}.png`, fullPage: true });
