@@ -869,3 +869,14 @@ Stop point: Corrective Slice 4 only. Do not continue unrelated roadmap work.
 - Prepared draft-only task permission catalog forward/rollback/validation artifacts under `supabase/drafts/20260722_corrective_slice_5_permission_catalog_*`. Runtime task/reimbursement permission keys remain `LIVE_APPROVAL_REQUIRED` because adding approved catalog keys/backfills is a live schema/data boundary.
 
 Stop point: Corrective Slice 5 only. Do not begin Production Order or another roadmap slice.
+
+## 2026-07-22 Corrective Slice 5 permission contract repair before live catalog rollout
+
+Status: application contract and reviewed artifact preparation complete; live rollout not executed.
+
+- Added approved task permission keys `TASK_VIEW`, `TASK_MANAGE`, `TASK_ASSIGN`, `TASK_REVIEW` and approved reimbursement keys `REIMBURSEMENT_SUBMIT`, `REIMBURSEMENT_REVIEW`, `REIMBURSEMENT_APPROVE`, `REIMBURSEMENT_MARK_PAID` to the canonical application permission contract, editor grouping, Vietnamese labels, preset model, server-side permission whitelist, and effective-permission paths.
+- Presets are conservative: Administrator has all ordinary application permissions; HR has no reimbursement approval/payment by default; Project Manager and Creative Lead have approved task permissions; Staff has only `TASK_VIEW` and `REIMBURSEMENT_SUBMIT` by default. Preset application remains separate from workspace grants.
+- Reimbursement approval permission and payment-confirmation permission are separate in application validation; requester self-approval remains blocked by default.
+- Repaired Slice 5 forward, rollback, and validation SQL artifacts under `supabase/drafts/20260722_corrective_slice_5_permission_catalog_*` so they match the approved eight-key application contract and include preset-mapping validation, conflict/compatibility notes, workspace-grant no-change validation, System Owner protection validation, unexpected-access validation, and DENY-precedence validation.
+
+No SQL was executed. No live permission catalog, employee permission row, workspace grant, RLS, migration, backfill, deployment, or production data was mutated. Current gate: `LIVE_APPROVAL_REQUIRED` before reviewed permission-catalog rollout.
