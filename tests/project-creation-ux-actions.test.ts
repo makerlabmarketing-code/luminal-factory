@@ -64,6 +64,25 @@ describe('project creation UX, detail actions, and request cleanup', () => {
     expect(taskPage).not.toMatch(/handleUpdatePhaseStatus/);
   });
 
+
+  it('keeps project detail progress and modals accessible without changing mutation contracts', () => {
+    const detailPage = source('app/admin/projects/[projectId]/page.tsx');
+
+    expect(detailPage).toMatch(/role="progressbar"/);
+    expect(detailPage).toMatch(/aria-valuenow=\{projectDetail\.progressPercent\}/);
+    expect(detailPage).toMatch(/aria-labelledby="add-member-title"/);
+    expect(detailPage).toMatch(/aria-describedby="add-member-description"/);
+    expect(detailPage).toMatch(/htmlFor="project-member-employee"/);
+    expect(detailPage).toMatch(/id="project-member-employee"/);
+    expect(detailPage).toMatch(/aria-labelledby="edit-task-title"/);
+    expect(detailPage).toMatch(/aria-describedby="edit-task-description"/);
+    expect(detailPage).toMatch(/htmlFor="edit-task-assignee"/);
+    expect(detailPage).toMatch(/id="edit-task-assignee"/);
+    expect(detailPage).toMatch(/htmlFor="edit-task-comment"/);
+    expect(detailPage).not.toMatch(/aria-label="Thêm thành viên dự án"/);
+    expect(detailPage).not.toMatch(/aria-label="Sửa công việc con"/);
+  });
+
   it('links project names from the task list to the detail page', () => {
     const taskPage = source('app/admin/tasks/page.tsx');
 

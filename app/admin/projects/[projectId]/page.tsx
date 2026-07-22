@@ -864,8 +864,15 @@ export default function ProjectDetailPage() {
           <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <p className="text-[10px] font-bold text-slate-500">Tiến độ dự án</p>
-              <p className="mt-1 text-2xl font-black text-cyan-300">{projectDetail.progressPercent}%</p>
-              <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-slate-800 lg:w-96">
+              <p className="mt-1 text-2xl font-black text-cyan-300" id="project-progress-label">{projectDetail.progressPercent}%</p>
+              <div
+                className="mt-3 h-2 w-full overflow-hidden rounded-full bg-slate-800 lg:w-96"
+                role="progressbar"
+                aria-labelledby="project-progress-label"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={projectDetail.progressPercent}
+              >
                 <div className="h-full rounded-full bg-cyan-400" style={{ width: `${projectDetail.progressPercent}%` }} />
               </div>
             </div>
@@ -1257,18 +1264,21 @@ export default function ProjectDetailPage() {
         </div>
       </div>
         {addMemberOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4" role="dialog" aria-modal="true" aria-label="Thêm thành viên dự án">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4" role="dialog" aria-modal="true" aria-labelledby="add-member-title" aria-describedby="add-member-description">
             <div className="w-full max-w-lg rounded-xl border border-slate-800 bg-slate-900 p-4 shadow-2xl">
-              <div className="mb-4"><h2 className="text-base font-black text-slate-100">Thêm thành viên dự án</h2><p className="text-xs text-slate-500">Chỉ tải danh sách nhân sự ACTIVE khi mở modal.</p></div>
+              <div className="mb-4">
+                <h2 className="text-base font-black text-slate-100" id="add-member-title">Thêm thành viên dự án</h2>
+                <p className="text-xs text-slate-500" id="add-member-description">Chỉ tải danh sách nhân sự ACTIVE khi mở modal.</p>
+              </div>
               <div className="space-y-3">
-                <label className="block text-xs font-bold text-slate-300">Nhân sự</label>
-                <select value={memberEmployeeId} onChange={(event) => setMemberEmployeeId(event.target.value)} disabled={membersLoading || memberActionLoading} className="w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-slate-100">
+                <label htmlFor="project-member-employee" className="block text-xs font-bold text-slate-300">Nhân sự</label>
+                <select id="project-member-employee" value={memberEmployeeId} onChange={(event) => setMemberEmployeeId(event.target.value)} disabled={membersLoading || memberActionLoading} className="w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-slate-100">
                   <option value="">Chọn nhân sự</option>
                   {candidateEmployees.map((employee) => <option key={employee.employeeId} value={employee.employeeId}>{employee.fullName}{employee.title ? ` · ${employee.title}` : ''}</option>)}
                 </select>
                 {candidateEmployeesLoaded && candidateEmployees.length === 0 && <p className="text-xs text-slate-500">Không còn nhân sự ACTIVE nào chưa có membership ACTIVE.</p>}
-                <label className="block text-xs font-bold text-slate-300">Vai trò dự án</label>
-                <select value={memberRoleCode} onChange={(event) => setMemberRoleCode(event.target.value as ProjectMemberDTO['roleCode'])} disabled={memberActionLoading} className="w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-slate-100">
+                <label htmlFor="project-member-role" className="block text-xs font-bold text-slate-300">Vai trò dự án</label>
+                <select id="project-member-role" value={memberRoleCode} onChange={(event) => setMemberRoleCode(event.target.value as ProjectMemberDTO['roleCode'])} disabled={memberActionLoading} className="w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-slate-100">
                   <option value="PROJECT_OWNER">Chủ dự án</option><option value="PROJECT_MANAGER">Quản lý dự án</option><option value="CREATIVE_LEAD">Lead sáng tạo</option><option value="CONTRIBUTOR">Thành viên</option>
                 </select>
               </div>
@@ -1278,29 +1288,29 @@ export default function ProjectDetailPage() {
         )}
 
         {editingTask && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4" role="dialog" aria-modal="true" aria-label="Sửa công việc con">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4" role="dialog" aria-modal="true" aria-labelledby="edit-task-title" aria-describedby="edit-task-description">
             <div className="w-full max-w-xl rounded-xl border border-slate-800 bg-slate-900 p-4 shadow-2xl">
               <div className="mb-4">
-                <h2 className="text-base font-black text-slate-100">Sửa công việc con</h2>
-                <p className="text-xs text-slate-500">Người phụ trách phải là thành viên ACTIVE của dự án.</p>
+                <h2 className="text-base font-black text-slate-100" id="edit-task-title">Sửa công việc con</h2>
+                <p className="text-xs text-slate-500" id="edit-task-description">Người phụ trách phải là thành viên ACTIVE của dự án.</p>
               </div>
               <div className="space-y-3 text-xs">
-                <label className="block font-bold text-slate-300">Người phụ trách</label>
-                <select value={editingTask.assigneeEmployeeId} onChange={(event) => setEditingTask({ ...editingTask, assigneeEmployeeId: event.target.value })} disabled={taskActionLoading !== null} className="w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100">
+                <label htmlFor="edit-task-assignee" className="block font-bold text-slate-300">Người phụ trách</label>
+                <select id="edit-task-assignee" value={editingTask.assigneeEmployeeId} onChange={(event) => setEditingTask({ ...editingTask, assigneeEmployeeId: event.target.value })} disabled={taskActionLoading !== null} className="w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100">
                   <option value="">Chưa phân công</option>
                   {activeProjectMembers.map((member) => <option key={member.employeeId} value={member.employeeId}>{member.fullName}{member.title ? ` · ${member.title}` : ''}</option>)}
                 </select>
-                <label className="block font-bold text-slate-300">Deadline</label>
-                <input type="date" value={editingTask.deadline} onChange={(event) => setEditingTask({ ...editingTask, deadline: event.target.value })} disabled={taskActionLoading !== null} className="w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100" />
-                <label className="block font-bold text-slate-300">Trạng thái</label>
-                <select value={editingTask.status} onChange={(event) => setEditingTask({ ...editingTask, status: event.target.value as TaskAssignmentStatus })} disabled={taskActionLoading !== null} className="w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100">
+                <label htmlFor="edit-task-deadline" className="block font-bold text-slate-300">Deadline</label>
+                <input id="edit-task-deadline" type="date" value={editingTask.deadline} onChange={(event) => setEditingTask({ ...editingTask, deadline: event.target.value })} disabled={taskActionLoading !== null} className="w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100" />
+                <label htmlFor="edit-task-status" className="block font-bold text-slate-300">Trạng thái</label>
+                <select id="edit-task-status" value={editingTask.status} onChange={(event) => setEditingTask({ ...editingTask, status: event.target.value as TaskAssignmentStatus })} disabled={taskActionLoading !== null} className="w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100">
                   {TASK_STATUS_OPTIONS.filter((option) => {
                     const currentTask = projectTasks.find((task) => task.taskId === editingTask.taskId);
                     return !currentTask || allowedNextTaskStatuses(currentTask.status).includes(option.value);
                   }).map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                 </select>
-                <label className="block font-bold text-slate-300">Bình luận</label>
-                <textarea value={editingTask.comment} onChange={(event) => setEditingTask({ ...editingTask, comment: event.target.value })} disabled={taskActionLoading !== null} rows={4} className="w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100 outline-none" placeholder="Nhập bình luận cho công việc" />
+                <label htmlFor="edit-task-comment" className="block font-bold text-slate-300">Bình luận</label>
+                <textarea id="edit-task-comment" value={editingTask.comment} onChange={(event) => setEditingTask({ ...editingTask, comment: event.target.value })} disabled={taskActionLoading !== null} rows={4} className="w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100 outline-none" placeholder="Nhập bình luận cho công việc" />
                 <div className="rounded-lg border border-slate-800 bg-slate-950 p-3 text-slate-400" aria-live="polite">
                   {editingTaskIntent && hasTaskEditChanges(editingTaskIntent)
                     ? `Sẽ cập nhật ${editingTaskIntent.changedLabels.join(', ')}.`
