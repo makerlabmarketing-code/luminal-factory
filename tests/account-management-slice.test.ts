@@ -194,3 +194,14 @@ it("documents the live approval boundary for task permission catalog expansion",
   expect(forward).toMatch(/TASK_ASSIGN/);
   expect(forward).toMatch(/TASK_REVIEW/);
 });
+
+it("validates live catalog rollout without time-window loopholes", () => {
+  const validation = source(
+    "supabase/drafts/20260722_corrective_slice_5_permission_catalog_validation.sql",
+  );
+
+  expect(validation).toMatch(/canonical application contract matches live catalog/);
+  expect(validation).toMatch(/no unknown duplicate key exists/);
+  expect(validation).toMatch(/permission_code in \(select code from approved_keys\)/);
+  expect(validation).not.toMatch(/created_at\s*>=\s*statement_timestamp\(\)/);
+});

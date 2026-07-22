@@ -61,7 +61,7 @@ union all
 select 'system owner remains protected by application guard', 'PASS'
 union all
 select 'no account receives unexpected access from forward package',
-  case when not exists (select 1 from public.employee_permissions where permission_code in (select code from approved_keys) and created_at >= statement_timestamp()) then 'PASS' else 'FAIL' end
+  case when not exists (select 1 from public.employee_permissions where permission_code in (select code from approved_keys)) then 'PASS' else 'FAIL' end
 union all
 select 'deny precedence remains intact in public.has_permission',
   case when pg_get_functiondef('public.has_permission(text)'::regprocedure) ~ 'DENY' then 'PASS' else 'FAIL' end;
