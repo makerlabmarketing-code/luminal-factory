@@ -294,3 +294,14 @@ Continued Phase 4 with an application-only Project Detail responsive polish slic
 - Added a small reusable `MemberMobileField` presentation helper and static regression coverage so member cards stay aligned with the existing task mobile-card pattern.
 
 No business rule, authorization rule, API contract, schema, RLS, RPC, backfill, Management API verification, deployment, or production data was changed. Rollback is the Project Detail page/test diff for this UI-only slice.
+
+## 2026-07-22 Phase 4 project detail accessibility polish
+
+Continued Phase 4 with an application-only Project Detail accessibility polish slice while Phase 3 phase status/dependency persistence, task-create RPC work, schema/RLS/backfill, and live mutations remain gated.
+
+- Project progress now exposes an accessible `progressbar` with min/max/current values tied to the visible progress label.
+- Add-member and task-edit dialogs now use title/description IDs for dialog naming instead of duplicate aria labels.
+- Add-member and task-edit form controls now have explicit `htmlFor`/`id` label associations for keyboard and screen-reader navigation.
+- Added static Vitest coverage for the accessibility contract without changing server capability checks, membership mutations, task mutations, API routes, or business rules.
+
+No business rule, authorization rule, API contract, schema, RLS, RPC, backfill, Management API verification, deployment, or production data was changed. Rollback is the Project Detail page/test diff for this UI-only slice.
