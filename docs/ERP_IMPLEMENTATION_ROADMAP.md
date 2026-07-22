@@ -911,3 +911,11 @@ No SQL, migration, RLS change, RPC creation, inventory mutation, backfill, featu
 Management API verification status: `MANAGEMENT_API_UNAVAILABLE` for Cloudflare Error 1010 / `browser_signature_banned` or another confirmed infrastructure restriction unrelated to repository correctness. Skip only Management API project metadata and health verification; continue from the reviewed migration package, rollback package, validation SQL, compatibility/backfill plan, application contract, and reviewed RPC contract. Live SQL/RPC deployment still requires explicit `LIVE_APPROVAL_REQUIRED`, and validation failures unrelated to the Management API limitation must not be ignored.
 
 Stop point: Corrective Slice 6 only. Future schema/RPC/inventory persistence remains `LIVE_APPROVAL_REQUIRED` with forward, rollback, validation, security, and backfill artifacts before execution.
+
+### 2026-07-22 Corrective Slice 6 live persistence continuation
+
+- **Status:** `BLOCKED_MISSING_REVIEWED_ARTIFACT`.
+- **Preflight result:** Management API project metadata confirmed `Luminal Factory` (`kwfmfmpgpbfewpiizesv`) as `ACTIVE_HEALTHY`; `npx supabase --version` returned `2.109.1`; local `supabase/.temp/project-ref` matched `SUPABASE_PROJECT_REF`; read-only Management API SQL query succeeded and found no equivalent production-order migration objects in the checked catalog.
+- **Blocker:** The repository does not contain the reviewed Corrective Slice 6 forward, rollback, validation, compatibility/backfill, RLS/security, attachment-policy, notification-outbox, or RPC artifacts required by the approved live scope.
+- **Safety result:** Stopped before live mutation as required. No production SQL, RLS mutation, RPC deployment, backfill, inventory quantity mutation, application durable-adapter wiring, persistence-gate removal, deployment, or live data mutation was executed.
+- **Next allowed action:** Provide or commit the reviewed Corrective Slice 6 persistence artifact package, then rerun read-only pre-validation before applying the approved package through the Management API database query path.

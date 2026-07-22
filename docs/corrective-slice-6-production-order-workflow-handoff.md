@@ -41,3 +41,30 @@ If Supabase Management API verification returns Cloudflare Error 1010 / `browser
 ## Validation notes
 
 Focused regression coverage was added in `tests/production-order-workflow.test.ts` for template preview, atomic creation adapter behavior, stable identity, duplicate production code rejection, sequential stage gating, review requirement, locked-stage edit prevention, override reason, assignment eligibility, required-task completion, progress calculation, blocked/overdue summaries, duplicate notifications, mobile-safe detail structure, and no partial persistence.
+
+## 2026-07-22 live persistence continuation preflight
+
+Status: `BLOCKED_MISSING_REVIEWED_ARTIFACT`.
+
+Live mutation did not run. The continuation confirmed the target project through the Management API and local Supabase link metadata, then stopped before any DDL/RLS/RPC/backfill because the repository does not contain the reviewed Corrective Slice 6 production-order persistence package required by the live-approval scope.
+
+Preflight confirmations:
+
+- `MANAGEMENT_API_READY`: `https://api.supabase.com/v1/projects/kwfmfmpgpbfewpiizesv` returned project `Luminal Factory` with status `ACTIVE_HEALTHY`.
+- `CLI_READY`: `npx supabase --version` returned `2.109.1`; `npx supabase projects list --output json` listed the linked `Luminal Factory` project despite a non-blocking PostHog telemetry 403.
+- `PROJECT_LINK_MATCH`: `supabase/.temp/project-ref` and `SUPABASE_PROJECT_REF` both resolved to `kwfmfmpgpbfewpiizesv`.
+- Read-only Management API database query succeeded with HTTP 201 and showed no existing production-order tables, routines, or migration-history entries matching the reviewed scope names checked by pre-validation.
+- Existing compatibility tables checked by pre-validation are present: `projects`, `phases`, `tasks`, `project_members`, `task_comments`, and `task_notifications`.
+- Pre-validation found no checked inventory/stock/procurement mutation routines in the live schema.
+
+Required reviewed artifacts still missing from the repository:
+
+- Corrective Slice 6 forward SQL/RPC package.
+- Corrective Slice 6 rollback package.
+- Corrective Slice 6 validation SQL package.
+- Corrective Slice 6 compatibility/backfill package.
+- Corrective Slice 6 RLS/security package.
+- Corrective Slice 6 attachment-policy package.
+- Corrective Slice 6 notification-outbox integration package.
+
+Per the task stop conditions, the missing reviewed artifacts block live persistence, SQL validation, RPC rollout, and application wiring. No production SQL, RLS mutation, RPC deployment, backfill, inventory quantity mutation, application persistence-gate removal, deployment, or live data mutation was executed.
