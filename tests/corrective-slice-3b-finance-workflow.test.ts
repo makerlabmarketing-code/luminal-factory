@@ -87,7 +87,8 @@ describe('corrective slice 3B finance role model', () => {
       to: 'REJECTED',
       actorEmployeeId: 2,
       requesterEmployeeId: 1,
-      hasFinancePermission: false,
+      hasApprovalPermission: false,
+      hasPaymentConfirmationPermission: false,
       hasReviewPermission: true,
     })).toEqual({ ok: false, message: 'Từ chối yêu cầu cần có lý do.' });
 
@@ -96,7 +97,8 @@ describe('corrective slice 3B finance role model', () => {
       to: 'APPROVED',
       actorEmployeeId: 1,
       requesterEmployeeId: 1,
-      hasFinancePermission: true,
+      hasApprovalPermission: true,
+      hasPaymentConfirmationPermission: false,
       hasReviewPermission: true,
     })).toEqual({ ok: false, message: 'Nhân sự không được tự duyệt hoặc tự xác nhận đã thanh toán.' });
 
@@ -105,7 +107,8 @@ describe('corrective slice 3B finance role model', () => {
       to: 'PAID',
       actorEmployeeId: 2,
       requesterEmployeeId: 1,
-      hasFinancePermission: true,
+      hasApprovalPermission: false,
+      hasPaymentConfirmationPermission: true,
       hasReviewPermission: false,
     })).toEqual({ ok: true });
   });

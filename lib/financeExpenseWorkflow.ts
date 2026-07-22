@@ -167,7 +167,8 @@ export function canTransitionReimbursement(params: {
   to: ReimbursementRequestStatus;
   actorEmployeeId: string | number;
   requesterEmployeeId: string | number;
-  hasFinancePermission: boolean;
+  hasApprovalPermission: boolean;
+  hasPaymentConfirmationPermission: boolean;
   hasReviewPermission: boolean;
   rejectionReason?: string | null;
 }): { ok: true } | { ok: false; message: string } {
@@ -175,11 +176,15 @@ export function canTransitionReimbursement(params: {
     return { ok: false, message: 'Từ chối yêu cầu cần có lý do.' };
   }
 
-  if ((params.to === 'APPROVED' || params.to === 'REJECTED') && !params.hasReviewPermission) {
+  if (params.to === 'REJECTED' && !params.hasReviewPermission) {
     return { ok: false, message: 'Bạn không có quyền duyệt hoàn trả.' };
   }
 
-  if (params.to === 'PAID' && !params.hasFinancePermission) {
+  if (params.to === 'APPROVED' && !params.hasApprovalPermission) {
+    return { ok: false, message: 'Bạn không có quyền duyệt hoàn trả.' };
+  }
+
+  if (params.to === 'PAID' && !params.hasPaymentConfirmationPermission) {
     return { ok: false, message: 'Bạn không có quyền xác nhận thanh toán.' };
   }
 

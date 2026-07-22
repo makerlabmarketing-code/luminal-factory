@@ -97,3 +97,9 @@ Self-review classification: no actionable P0/P1 findings were identified in the 
 `REVIEW_SOURCE_UNAVAILABLE`: current Codex GitHub Code Review findings and unresolved PR conversations are not exposed in this environment. Corrective Slice 5 used the task-supplied account/permission model requirements, AGENTS.md, ERP/Supabase/UI/workflow references, roadmap, handoffs, remediation ledger, current code, and focused regression tests as the available review source.
 
 Self-review classification: no actionable P0/P1 findings were identified in the application-only account management service guards, preset model, UI copy/action menu changes, draft permission catalog artifacts, or focused regression tests. Task-domain permission catalog expansion remains `LIVE_APPROVAL_REQUIRED` and was not executed.
+
+## 2026-07-22 Corrective Slice 5 permission contract repair review source status
+
+`REVIEW_SOURCE_UNAVAILABLE`: current Codex GitHub Code Review findings and unresolved PR conversations are not exposed in this environment. This repair used the task-supplied rollout blockers, AGENTS.md, ERP/Supabase/UI/workflow references, roadmap, Slice 5 handoff, Corrective Slice 3B finance handoff, existing Slice 5 SQL artifacts, current application contract, and focused regression tests as the available review source.
+
+Self-review classification: no actionable P0/P1 findings were identified in the application permission contract expansion, preset mapping changes, reimbursement transition permission separation, reviewed SQL artifact repair, or focused regression tests. Live permission-catalog rollout remains `LIVE_APPROVAL_REQUIRED`; no SQL or live permission data mutation was executed.

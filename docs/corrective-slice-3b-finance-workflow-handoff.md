@@ -28,3 +28,14 @@ Backfill classification plan:
 ## Approval gate
 
 `LIVE_APPROVAL_REQUIRED` before any schema change, RLS change, storage bucket/policy change, transactional RPC, permission backfill, finance backfill, or live data mutation.
+
+## 2026-07-22 permission contract compatibility note
+
+Corrective Slice 5 approved the reimbursement permission names for application-contract preparation only:
+
+- `REIMBURSEMENT_SUBMIT`
+- `REIMBURSEMENT_REVIEW`
+- `REIMBURSEMENT_APPROVE`
+- `REIMBURSEMENT_MARK_PAID`
+
+The finance workflow contract keeps approval and paid confirmation separate. A requester cannot approve their own reimbursement by default, and payment confirmation remains distinct from approval. No SQL, schema change, RLS change, backfill, permission mutation, or live data mutation was executed.

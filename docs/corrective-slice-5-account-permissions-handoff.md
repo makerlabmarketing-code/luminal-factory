@@ -33,3 +33,16 @@ Focused and full repository validation were run after the application changes. R
 ## Next slice
 
 Stop after Corrective Slice 5. Do not start Production Order or any other roadmap slice from this handoff.
+
+## 2026-07-22 corrective permission contract repair
+
+Completed application-contract preparation before live permission-catalog rollout:
+
+- Added the approved task keys `TASK_VIEW`, `TASK_MANAGE`, `TASK_ASSIGN`, and `TASK_REVIEW` to the canonical TypeScript permission contract, grouping registry, Vietnamese labels, account-management editor source, server mutation whitelist, effective-permission counting, and preset detection path.
+- Added only the approved reimbursement keys `REIMBURSEMENT_SUBMIT`, `REIMBURSEMENT_REVIEW`, `REIMBURSEMENT_APPROVE`, and `REIMBURSEMENT_MARK_PAID`; no additional reimbursement permission key was invented and none was mapped to generic finance permissions.
+- Updated presets conservatively: Administrator receives all ordinary application permissions; HR receives no reimbursement review/approval/payment by default; Project Manager and Creative Lead receive the approved task permissions; Staff receives only `TASK_VIEW` and `REIMBURSEMENT_SUBMIT` by default.
+- Preset application still updates permission rows only and does not grant or revoke Staff/Admin workspace access.
+- Reimbursement transition validation now models approval permission and payment-confirmation permission separately; requester self-approval/self-payment confirmation remains blocked by default.
+- Repaired the Slice 5 reviewed SQL artifacts so the forward package only adds the approved eight keys, rollback refuses to remove keys that are referenced by employee permission rows, and validation checks contract parity, approved preset mappings, unchanged workspace grants, System Owner protection, unexpected access, and DENY precedence.
+
+No SQL was executed. No live permission data was mutated. Stop condition remains `LIVE_APPROVAL_REQUIRED` before applying the reviewed permission-catalog package.

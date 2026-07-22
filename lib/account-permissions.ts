@@ -12,6 +12,14 @@ export type PermissionCode =
   | "PROJECT_MANAGE"
   | "PROJECT_ASSIGN"
   | "PROJECT_REVIEW"
+  | "TASK_VIEW"
+  | "TASK_MANAGE"
+  | "TASK_ASSIGN"
+  | "TASK_REVIEW"
+  | "REIMBURSEMENT_SUBMIT"
+  | "REIMBURSEMENT_REVIEW"
+  | "REIMBURSEMENT_APPROVE"
+  | "REIMBURSEMENT_MARK_PAID"
   | "ATTENDANCE_VIEW"
   | "ATTENDANCE_MANAGE"
   | "SYSTEM_SETTINGS_VIEW"
@@ -57,6 +65,14 @@ export const ALL_PERMISSION_CODES: PermissionCode[] = [
   "PROJECT_MANAGE",
   "PROJECT_ASSIGN",
   "PROJECT_REVIEW",
+  "TASK_VIEW",
+  "TASK_MANAGE",
+  "TASK_ASSIGN",
+  "TASK_REVIEW",
+  "REIMBURSEMENT_SUBMIT",
+  "REIMBURSEMENT_REVIEW",
+  "REIMBURSEMENT_APPROVE",
+  "REIMBURSEMENT_MARK_PAID",
   "ATTENDANCE_VIEW",
   "ATTENDANCE_MANAGE",
   "SYSTEM_SETTINGS_VIEW",
@@ -93,6 +109,24 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
     ],
   },
   {
+    label: "Công việc",
+    permissions: [
+      { code: "TASK_VIEW", label: "Xem công việc" },
+      { code: "TASK_MANAGE", label: "Quản lý nội dung công việc" },
+      { code: "TASK_ASSIGN", label: "Giao người phụ trách công việc" },
+      { code: "TASK_REVIEW", label: "Duyệt kết quả công việc" },
+    ],
+  },
+  {
+    label: "Hoàn trả",
+    permissions: [
+      { code: "REIMBURSEMENT_SUBMIT", label: "Gửi đề nghị hoàn trả" },
+      { code: "REIMBURSEMENT_REVIEW", label: "Rà soát đề nghị hoàn trả" },
+      { code: "REIMBURSEMENT_APPROVE", label: "Duyệt đề nghị hoàn trả" },
+      { code: "REIMBURSEMENT_MARK_PAID", label: "Xác nhận đã thanh toán hoàn trả" },
+    ],
+  },
+  {
     label: "Chấm công",
     permissions: [
       { code: "ATTENDANCE_VIEW", label: "Xem chấm công" },
@@ -123,12 +157,25 @@ const projectManagerPermissions: PermissionCode[] = [
   "PROJECT_MANAGE",
   "PROJECT_ASSIGN",
   "PROJECT_REVIEW",
+  "TASK_VIEW",
+  "TASK_MANAGE",
+  "TASK_ASSIGN",
+  "TASK_REVIEW",
 ];
 
 const creativeLeadPermissions: PermissionCode[] = [
   "PROJECT_VIEW",
   "PROJECT_ASSIGN",
   "PROJECT_REVIEW",
+  "TASK_VIEW",
+  "TASK_MANAGE",
+  "TASK_ASSIGN",
+  "TASK_REVIEW",
+];
+
+const staffPermissions: PermissionCode[] = [
+  "TASK_VIEW",
+  "REIMBURSEMENT_SUBMIT",
 ];
 
 export const ACCOUNT_PRESETS: AccountPreset[] = [
@@ -160,7 +207,7 @@ export const ACCOUNT_PRESETS: AccountPreset[] = [
     code: "STAFF",
     label: "Nhân viên",
     workspaces: ["STAFF_WORKSPACE"],
-    permissions: [],
+    permissions: staffPermissions,
   },
   {
     code: "CUSTOM",

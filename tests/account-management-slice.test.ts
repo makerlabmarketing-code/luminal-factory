@@ -43,7 +43,7 @@ describe("account and permission management slice", () => {
     ]);
     expect(administrator?.permissions).toEqual(ALL_PERMISSION_CODES);
     expect(staff?.workspaces).toEqual(["STAFF_WORKSPACE"]);
-    expect(staff?.permissions).toEqual([]);
+    expect(staff?.permissions).toEqual(["TASK_VIEW", "REIMBURSEMENT_SUBMIT"]);
     expect(
       ACCOUNT_PRESETS.find((preset) => preset.code === "HR_MANAGER")
         ?.permissions,
@@ -56,6 +56,10 @@ describe("account and permission management slice", () => {
       ACCOUNT_PRESETS.find((preset) => preset.code === "CREATIVE_LEAD")
         ?.permissions,
     ).not.toContain("PROJECT_MANAGE");
+    expect(
+      ACCOUNT_PRESETS.find((preset) => preset.code === "CREATIVE_LEAD")
+        ?.permissions,
+    ).toEqual(expect.arrayContaining(["TASK_VIEW", "TASK_MANAGE", "TASK_ASSIGN", "TASK_REVIEW"]));
     expect(ACCOUNT_PRESETS.map((preset) => preset.code)).toEqual([
       "ADMINISTRATOR",
       "HR_MANAGER",
@@ -71,9 +75,39 @@ describe("account and permission management slice", () => {
       "Nhân sự",
       "Tài chính",
       "Dự án",
+      "Công việc",
+      "Hoàn trả",
       "Chấm công",
       "Hệ thống",
     ]);
+  });
+
+
+  it("keeps the canonical permission registry complete and duplicate-free", () => {
+    const approvedKeys = [
+      "TASK_VIEW",
+      "TASK_MANAGE",
+      "TASK_ASSIGN",
+      "TASK_REVIEW",
+      "REIMBURSEMENT_SUBMIT",
+      "REIMBURSEMENT_REVIEW",
+      "REIMBURSEMENT_APPROVE",
+      "REIMBURSEMENT_MARK_PAID",
+    ];
+
+    expect(ALL_PERMISSION_CODES).toEqual(expect.arrayContaining(approvedKeys));
+    expect(new Set(ALL_PERMISSION_CODES).size).toBe(ALL_PERMISSION_CODES.length);
+
+    const groupedCodes = PERMISSION_GROUPS.flatMap((group) =>
+      group.permissions.map((permission) => permission.code),
+    );
+    expect(groupedCodes).toEqual(expect.arrayContaining(approvedKeys));
+    expect(new Set(groupedCodes).size).toBe(groupedCodes.length);
+    expect(PERMISSION_GROUPS.flatMap((group) => group.permissions)).toEqual(
+      expect.arrayContaining(
+        approvedKeys.map((code) => expect.objectContaining({ code, label: expect.any(String) })),
+      ),
+    );
   });
 
   it("implements the requested account API contract", () => {
