@@ -284,3 +284,13 @@ Completed with live approval through the Supabase Management API HTTPS SQL mutat
 - Application project creation now calls the transactional RPC with the authenticated server client and no longer uses the legacy direct project insert path when creating new projects.
 
 Rollback remains the reviewed rollback SQL artifact and requires separate approval unless validation shows the schema is unsafe.
+
+## 2026-07-22 Phase 4 project detail member mobile polish
+
+Continued Phase 4 with an application-only Project Detail responsive polish slice while Phase 3 phase status/dependency persistence, task-create RPC work, schema/RLS/backfill, and live mutations remain gated.
+
+- Project Detail member management now keeps the desktop table for medium+ screens and renders mobile member cards below that breakpoint.
+- Mobile cards expose member name, status, title, project role, joined date, assignability, and full-width role/revoke actions without changing server capability checks or mutation contracts.
+- Added a small reusable `MemberMobileField` presentation helper and static regression coverage so member cards stay aligned with the existing task mobile-card pattern.
+
+No business rule, authorization rule, API contract, schema, RLS, RPC, backfill, Management API verification, deployment, or production data was changed. Rollback is the Project Detail page/test diff for this UI-only slice.

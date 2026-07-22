@@ -325,6 +325,15 @@ function TaskMobileField({ label, value }: { label: string; value: string }) {
   );
 }
 
+function MemberMobileField({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="text-[10px] font-bold text-slate-500">{label}</dt>
+      <dd className="mt-0.5 break-words text-xs text-slate-300">{value}</dd>
+    </div>
+  );
+}
+
 export default function ProjectDetailPage() {
   const params = useParams<{ projectId: string }>();
   const router = useRouter();
@@ -979,21 +988,43 @@ export default function ProjectDetailPage() {
                     description="Thêm thành viên ACTIVE trước khi giao việc bằng mã nhân sự ổn định."
                   />
                 ) : (
-                  <table className="w-full min-w-[760px] text-left text-xs">
-                    <thead className="text-slate-500"><tr className="border-b border-slate-800"><th className="py-2 pr-3">Nhân viên</th><th className="py-2 pr-3">Chức vụ</th><th className="py-2 pr-3">Vai trò</th><th className="py-2 pr-3">Trạng thái</th><th className="py-2 pr-3">Ngày tham gia</th><th className="py-2">Thao tác</th></tr></thead>
-                    <tbody className="divide-y divide-slate-800">
+                  <>
+                    <table className="hidden w-full min-w-[760px] text-left text-xs md:table">
+                      <thead className="text-slate-500"><tr className="border-b border-slate-800"><th className="py-2 pr-3">Nhân viên</th><th className="py-2 pr-3">Chức vụ</th><th className="py-2 pr-3">Vai trò</th><th className="py-2 pr-3">Trạng thái</th><th className="py-2 pr-3">Ngày tham gia</th><th className="py-2">Thao tác</th></tr></thead>
+                      <tbody className="divide-y divide-slate-800">
+                        {projectDetail.members.map((member) => (
+                          <tr key={member.membershipId}>
+                            <td className="py-3 pr-3 font-bold text-slate-100">{member.fullName}</td>
+                            <td className="py-3 pr-3 text-slate-300">{member.title || 'Chưa có'}</td>
+                            <td className="py-3 pr-3 text-slate-300">{member.roleLabel}</td>
+                            <td className="py-3 pr-3"><span className={`rounded border px-2 py-1 ${member.status === 'ACTIVE' ? 'border-emerald-800 text-emerald-200' : 'border-slate-700 text-slate-400'}`}>{member.status === 'ACTIVE' ? 'Đang hoạt động' : 'Đã thu hồi'}</span></td>
+                            <td className="py-3 pr-3 text-slate-300">{formatDate(member.joinedAt)}</td>
+                            <td className="py-3"><div className="flex gap-2"><button type="button" disabled={!canManageMembers || member.status !== 'ACTIVE' || memberActionLoading} onClick={() => handleChangeRole(member)} className="rounded border border-slate-700 px-2 py-1 font-bold text-slate-300 disabled:opacity-40">Đổi vai trò</button><button type="button" disabled={!canManageMembers || member.status !== 'ACTIVE' || memberActionLoading} onClick={() => handleRevokeMember(member)} className="rounded border border-amber-800 px-2 py-1 font-bold text-amber-200 disabled:opacity-40">Thu hồi</button></div></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    <div className="space-y-3 md:hidden">
                       {projectDetail.members.map((member) => (
-                        <tr key={member.membershipId}>
-                          <td className="py-3 pr-3 font-bold text-slate-100">{member.fullName}</td>
-                          <td className="py-3 pr-3 text-slate-300">{member.title || 'Chưa có'}</td>
-                          <td className="py-3 pr-3 text-slate-300">{member.roleLabel}</td>
-                          <td className="py-3 pr-3"><span className={`rounded border px-2 py-1 ${member.status === 'ACTIVE' ? 'border-emerald-800 text-emerald-200' : 'border-slate-700 text-slate-400'}`}>{member.status === 'ACTIVE' ? 'Đang hoạt động' : 'Đã thu hồi'}</span></td>
-                          <td className="py-3 pr-3 text-slate-300">{formatDate(member.joinedAt)}</td>
-                          <td className="py-3"><div className="flex gap-2"><button type="button" disabled={!canManageMembers || member.status !== 'ACTIVE' || memberActionLoading} onClick={() => handleChangeRole(member)} className="rounded border border-slate-700 px-2 py-1 font-bold text-slate-300 disabled:opacity-40">Đổi vai trò</button><button type="button" disabled={!canManageMembers || member.status !== 'ACTIVE' || memberActionLoading} onClick={() => handleRevokeMember(member)} className="rounded border border-amber-800 px-2 py-1 font-bold text-amber-200 disabled:opacity-40">Thu hồi</button></div></td>
-                        </tr>
+                        <article key={member.membershipId} className="rounded-lg border border-slate-800 bg-slate-950 p-3 text-xs">
+                          <div className="flex items-start justify-between gap-3">
+                            <h3 className="font-bold text-slate-100">{member.fullName}</h3>
+                            <span className={`shrink-0 rounded border px-2 py-0.5 text-[10px] ${member.status === 'ACTIVE' ? 'border-emerald-800 text-emerald-200' : 'border-slate-700 text-slate-400'}`}>{member.status === 'ACTIVE' ? 'Đang hoạt động' : 'Đã thu hồi'}</span>
+                          </div>
+                          <dl className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                            <MemberMobileField label="Chức vụ" value={member.title || 'Chưa có'} />
+                            <MemberMobileField label="Vai trò" value={member.roleLabel} />
+                            <MemberMobileField label="Ngày tham gia" value={formatDate(member.joinedAt)} />
+                            <MemberMobileField label="Khả dụng giao việc" value={member.isAssignable ? 'Có thể giao việc' : 'Không khả dụng'} />
+                          </dl>
+                          <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                            <button type="button" disabled={!canManageMembers || member.status !== 'ACTIVE' || memberActionLoading} onClick={() => handleChangeRole(member)} className="w-full rounded border border-slate-700 px-2 py-2 font-bold text-slate-300 disabled:opacity-40">Đổi vai trò</button>
+                            <button type="button" disabled={!canManageMembers || member.status !== 'ACTIVE' || memberActionLoading} onClick={() => handleRevokeMember(member)} className="w-full rounded border border-amber-800 px-2 py-2 font-bold text-amber-200 disabled:opacity-40">Thu hồi</button>
+                          </div>
+                        </article>
                       ))}
-                    </tbody>
-                  </table>
+                    </div>
+                  </>
                 )}
               </div>
             </section>
