@@ -69,3 +69,9 @@ Post-validation passed after execution:
 - No workspace grant, employee permission assignment, preset application, System Owner row, RLS policy, schema object, backfill, deployment, or production workspace mutation was performed.
 
 Rollback path: use `supabase/drafts/20260722_corrective_slice_5_permission_catalog_rollback.sql` only with separate live approval. The rollback artifact refuses to remove approved catalog keys once employee permission rows reference them.
+
+## 2026-07-22 live validation remediation
+
+A self-review of the latest-main live catalog rollout artifacts found one actionable validation weakness: the unexpected-access check used `created_at >= statement_timestamp()`, which could miss approved-key `employee_permissions` rows created before the validation statement. The validation artifact now fails whenever any employee permission row references the eight approved task/reimbursement keys, matching the live rollout acceptance condition that no account received those assignments.
+
+No SQL was executed. No live permission catalog row, employee permission row, workspace grant, RLS policy, schema object, backfill, deployment, or production data was mutated. Corrective Slice 6 was not started.
