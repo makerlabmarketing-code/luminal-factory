@@ -951,3 +951,22 @@ Stop point: Corrective Slice 6 only. Future schema/RPC/inventory persistence rem
 Status: documentation-only review refresh complete. The latest supplied PR diff/comment bundle for the current remediation commit contained no inline comments or newly actionable Codex Code Review findings for Corrective Slice 3, Slice 3B, Slice 4, Slice 5, or Slice 6. Those slices are closed for this remediation sweep. Existing live gates remain unchanged: task atomicity and production-order live execution still require their separate approval/network paths. Slice 7 was not started.
 
 No application code, SQL execution, migration execution, RLS mutation, schema mutation, backfill, deployment, production-data mutation, inventory quantity mutation, or completed-slice redesign was performed.
+
+## 2026-07-23 Corrective Slice 7 project detail phase edit accessibility
+
+Status: application-only Corrective Slice 7 complete. Continued the roadmap's next safe Phase 4 Project Detail accessibility polish without revisiting completed Corrective Slices 3 through 6.
+
+Completed:
+
+- Added an accessible region name for inline selected-phase editing.
+- Connected phase-name and phase-order controls to explicit labels while preserving the compact Vietnamese UI.
+- Added explicit button types for inline phase edit actions.
+- Extended existing static Project Detail accessibility regression coverage.
+
+Database impact: none. No schema, RPC, RLS, storage, backfill, migration execution, production SQL, deployment, or live data mutation was performed.
+
+Security impact: mutation authority remains server-side and unchanged. No client-side permission expansion, service-role exposure, workspace grant, employee permission assignment, or production data mutation was introduced.
+
+Validation: `npm test`, `npm run lint`, `npx tsc --noEmit`, `npm run build`, and `git diff --check` PASS.
+
+Stop point: Corrective Slice 7 only. Do not continue beyond Slice 7 without a new explicit roadmap instruction.

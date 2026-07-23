@@ -79,6 +79,11 @@ describe('project creation UX, detail actions, and request cleanup', () => {
     expect(detailPage).toMatch(/htmlFor="edit-task-assignee"/);
     expect(detailPage).toMatch(/id="edit-task-assignee"/);
     expect(detailPage).toMatch(/htmlFor="edit-task-comment"/);
+    expect(detailPage).toMatch(/aria-labelledby="edit-phase-title"/);
+    expect(detailPage).toMatch(/htmlFor="edit-phase-name"/);
+    expect(detailPage).toMatch(/id="edit-phase-name"/);
+    expect(detailPage).toMatch(/htmlFor="edit-phase-order"/);
+    expect(detailPage).toMatch(/id="edit-phase-order"/);
     expect(detailPage).not.toMatch(/aria-label="Thêm thành viên dự án"/);
     expect(detailPage).not.toMatch(/aria-label="Sửa công việc con"/);
   });
