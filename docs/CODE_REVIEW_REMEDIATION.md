@@ -189,3 +189,28 @@ No migration, SQL execution, RLS mutation, RPC deployment, backfill, production 
 | Risk of unapproved SQL, broad browser writes, or inventory quantity mutation in canonical migration. | ACTIONABLE | Delivery path requires no draft/unapproved SQL under migrations and no inventory mutation. | Added static regression coverage verifying canonical migration parity, rollback/validation exclusion, no broad browser write policy, and no inventory quantity mutation. |
 
 No direct SQL, database TCP retry, backfill, deployment, inventory mutation, destructive operation, or Slice 7 work was performed. Production migration execution remains delegated to the configured Supabase GitHub Integration after protected main-branch merge and post-deployment validation.
+
+## 2026-07-23 latest-main Slice 3 through Slice 6 actionable review sweep
+
+Scope inspected: Corrective Slice 3, Corrective Slice 3B, Corrective Slice 4, Corrective Slice 5, and Corrective Slice 6 only. Slice 7 was not started, and no completed slice was redesigned.
+
+Review-source rule: prior findings already classified as `ALREADY_FIXED_AND_VERIFIED`, `FALSE_POSITIVE_WITH_EVIDENCE`, or `REVIEW_SOURCE_UNAVAILABLE` were not reopened. Current connected Codex Code Review findings and unresolved PR conversations remain unavailable in this environment, so this sweep used the current latest-main checkout, this remediation ledger, related handoff documents, roadmap entries, and regression tests as the available evidence.
+
+| Scope | Remaining actionable finding | Classification | Remediation status | Evidence |
+| --- | --- | --- | --- | --- |
+| Corrective Slice 3 | None newly identified from available sources. The non-atomic task-create finding remains gated by `LIVE_APPROVAL_REQUIRED` and was not reclassified as actionable application work. | LIVE_APPROVAL_REQUIRED / no new actionable code finding | Unchanged | Application task creation stays behind the atomic RPC gate and existing ledger rows remain `ALREADY_FIXED_AND_VERIFIED` or `LIVE_APPROVAL_REQUIRED`. |
+| Corrective Slice 3B | None newly identified from available sources. | No new actionable finding | Unchanged | Finance workflow handoff and permission dependencies remain documented; no finance workflow redesign was performed. |
+| Corrective Slice 4 | None newly identified from available sources. | No new actionable finding | Unchanged | Project execution/mobile/accessibility handoffs remain application-only and preserve existing mutation authority. |
+| Corrective Slice 5 | None remaining after the duplicate active workspace/permission row finding was fixed in current code. | CLOSED_AFTER_AVAILABLE_REVIEW_REFRESH | Closed for Slices 3 through 6 based on the provided latest PR diff/comment bundle and local remediation evidence. | `grantWorkspace` and `setPermissionState` load all matching active rows in deterministic ID order and revoke duplicate active rows before returning success; regression test `collapses duplicate active workspace and permission rows before reporting success` covers both paths. |
+| Corrective Slice 6 | No remaining application actionable finding identified from available sources. GitHub Integration delivery path is prepared; live execution remains environment/approval gated. | LIVE_APPROVAL_REQUIRED / DATABASE_TCP_UNAVAILABLE where applicable | Unchanged | Reviewed forward migration delivery exists under `supabase/migrations/`; rollback and validation remain outside migrations; static tests validate package parity, no broad browser writes, and no inventory mutation. |
+
+No SQL, migration execution, RLS mutation, schema mutation, workspace grant, employee permission assignment, backfill, deployment, destructive operation, production data mutation, inventory quantity mutation, or Slice 7 work was performed during this sweep.
+
+
+## 2026-07-23 latest PR review refresh and closure
+
+Latest PR review input inspected for the current remediation commit: the supplied PR title, description, diff summary, and comments bundle for `Document latest Slice 3-6 review remediation sweep`. The bundle contained no inline diff comments or newly actionable Codex Code Review findings. Prior entries classified as `ALREADY_FIXED_AND_VERIFIED`, `FALSE_POSITIVE_WITH_EVIDENCE`, or `REVIEW_SOURCE_UNAVAILABLE` were not reopened.
+
+Closure decision: Corrective Slice 3, Slice 3B, Slice 4, Slice 5, and Slice 6 are closed for the current documentation-only review-remediation sweep. The Slice 5 duplicate-active-row finding remains fixed in code and covered by regression evidence; no additional application-code change was required by the latest review input.
+
+No SQL, migration execution, RLS mutation, schema mutation, workspace grant, employee permission assignment, backfill, deployment, destructive operation, production data mutation, inventory quantity mutation, application-code modification, or Slice 7 work was performed during this refresh.
