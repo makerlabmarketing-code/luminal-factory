@@ -25,7 +25,7 @@ describe('staff attendance portal regression contract', () => {
     const route = source('app/api/staff/attendance/route.ts');
     const adminEmployeeData = source('services/server/adminEmployeeData.ts');
 
-    expect(route).toMatch(/const FACILITY_SELECT = 'id, facility_name, lat, lng, radius'/);
+    expect(route).toMatch(/const BASE_FACILITY_SELECT = 'id, facility_name, lat, lng, radius'/);
     expect(route).not.toMatch(/FACILITY_SELECT = 'id, name, facility_name, code/);
     expect(adminEmployeeData).toMatch(/from\('facilities'\)\.select\('id, facility_name'\)/);
     expect(adminEmployeeData).not.toMatch(/from\('facilities'\)\.select\('id, name, facility_name, code'\)/);

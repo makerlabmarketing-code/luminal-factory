@@ -6,4 +6,5 @@ export interface Facility {
     lat?: number | string | null;
     lng?: number | string | null;
     radius?: number | string | null;
+    is_active?: boolean | null;
   }

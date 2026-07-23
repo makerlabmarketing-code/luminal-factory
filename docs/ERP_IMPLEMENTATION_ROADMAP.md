@@ -1096,3 +1096,23 @@ Completed:
 Validation: guidance regression coverage was added in `tests/repository-guidance-workflow.test.ts`; final command results are recorded in the delivery response.
 
 Next safe action: after this guidance PR is created, continue the next approved roadmap feature from the latest protected-main state using the refreshed workflow.
+
+## 2026-07-23 Facility active-state application gate preparation
+
+Status: ✅ Application-only preparation complete; live enablement remains gated.
+
+Scope completed:
+
+- Staff Attendance now preserves the legacy facility select by default and adds a server-only `FACILITY_ACTIVE_STATE_ENABLED=true` gate for reading/filtering `facilities.is_active` after migration delivery and validation.
+- Admin facility DTO/listing now preserves the legacy facility select by default and adds the same gate for including `facilities.code` and `facilities.is_active` after validation.
+- Regression coverage records that inactive-facility filtering is not enabled unless the server-side gate is intentionally set.
+
+Validation run:
+
+- `npx vitest run tests/admin-ia-configuration-slice.test.ts tests/attendance-portal-regression.test.ts` PASS.
+
+Database impact: none in this application slice. The reviewed forward migration remains under `supabase/migrations/20260723120000_facility_status_code.sql`; rollback and validation artifacts remain under `supabase/drafts/`.
+
+Security impact: safer staged rollout because application reads do not request new columns until post-deployment validation allows a server-only gate. No browser Supabase mutation, RLS change, direct SQL, deployment, backfill, or production data mutation was performed.
+
+Next step: after protected-main merge and Supabase GitHub Integration delivery, run `supabase/drafts/20260723_facility_status_code_validation.sql`; only if PASS, enable `FACILITY_ACTIVE_STATE_ENABLED=true` in the server runtime and verify Staff Attendance GPS matching excludes inactive facilities.

@@ -81,3 +81,13 @@ Preserved safety artifacts:
 No direct production SQL, `supabase db push`, live backfill, RLS mutation, permission mutation, Auth mutation, deployment, destructive operation, unrelated table change, application redesign, inactive-facility filtering, or employee branch remapping was performed. After protected-main merge and Supabase GitHub Integration delivery, run the validation SQL and record PASS/FAIL before enabling any application behavior that depends on `facilities.code` or `facilities.is_active`.
 
 Rollback remains a separate live approval decision using the reviewed rollback artifact. The rollback script intentionally blocks if inactive facility rows exist.
+
+## 2026-07-23 Facility active-state application gate preparation
+
+Prepared the safe application-only side of facility active-state filtering without requiring the new production columns to exist yet:
+
+- Staff Attendance keeps the legacy `id, facility_name, lat, lng, radius` select by default.
+- After the Supabase GitHub Integration delivers `facilities.is_active` and post-deployment validation passes, operators may set server-only `FACILITY_ACTIVE_STATE_ENABLED=true` to make Staff Attendance select `is_active` and filter only active facilities.
+- Admin facility listing also keeps the legacy select by default, and only includes `code`/`is_active` in the DTO when the same server-side gate is enabled.
+
+No SQL, direct PostgreSQL TCP retry, RLS mutation, schema mutation, facility data mutation, backfill, production deployment, destructive operation, or live data mutation was performed. `LIVE_APPROVAL_REQUIRED` remains for production migration execution/rollback, post-deployment validation, and any live environment variable rollout.

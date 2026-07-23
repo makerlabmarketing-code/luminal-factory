@@ -21,7 +21,12 @@ import {
 
 const ATTENDANCE_SELECT =
   'id, employee_id, work_date, shift_name, check_in, check_out, total_hours, total_salary, status';
-const FACILITY_SELECT = 'id, facility_name, lat, lng, radius';
+const BASE_FACILITY_SELECT = 'id, facility_name, lat, lng, radius';
+const ACTIVE_FACILITY_SELECT = `${BASE_FACILITY_SELECT}, is_active`;
+
+function isFacilityActiveStateEnabled() {
+  return process.env.FACILITY_ACTIVE_STATE_ENABLED === 'true';
+}
 const STAFF_ATTENDANCE_ALLOWED_FIELDS = new Set(['userLat', 'userLng']);
 
 class StaffAttendanceError extends Error {
@@ -77,7 +82,11 @@ function isAttendanceRecordComplete(record: AttendanceRecord): boolean {
 
 async function loadFacilities() {
   const supabase = await createClient();
-  const { data, error } = await supabase.from('facilities').select(FACILITY_SELECT);
+  const query = supabase
+    .from('facilities')
+    .select(isFacilityActiveStateEnabled() ? ACTIVE_FACILITY_SELECT : BASE_FACILITY_SELECT);
+
+  const { data, error } = isFacilityActiveStateEnabled() ? await query.eq('is_active', true) : await query;
 
   if (error) {
     throw new StaffAttendanceError(
