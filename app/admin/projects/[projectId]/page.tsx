@@ -125,9 +125,9 @@ function formatDateTime(value?: string | null): string {
 }
 
 function formatDate(value?: string | null): string {
-  if (!value) return 'Chưa đặt deadline';
+  if (!value) return 'Chưa đặt hạn hoàn thành';
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 'Chưa đặt deadline';
+  if (Number.isNaN(date.getTime())) return 'Chưa đặt hạn hoàn thành';
 
   return date.toLocaleDateString('vi-VN');
 }
@@ -636,13 +636,13 @@ export default function ProjectDetailPage() {
 
   const handleRevokeMember = (member: ProjectMemberDTO) => {
     if (!canManageMembers || memberActionLoading) return;
-    showConfirm('Thu hồi thành viên', 'Thành viên sẽ không còn ACTIVE trong dự án, lịch sử vẫn được giữ lại.', async () => {
+    showConfirm('Thu hồi thành viên', 'Thành viên sẽ không còn hoạt động trong dự án, lịch sử vẫn được giữ lại.', async () => {
       setMemberActionLoading(true);
       try {
         const response = await fetch(`/api/admin/projects/${projectId}/members/${member.membershipId}/revoke`, { method: 'POST' });
         const payload = await response.json().catch(() => null) as { message?: string } | null;
         if (!response.ok) throw new Error(payload?.message || 'member_revoke_failed');
-        showToast('Đã thu hồi thành viên.', 'Lịch sử membership vẫn được giữ lại.', 'success');
+        showToast('Đã thu hồi thành viên.', 'Lịch sử thành viên vẫn được giữ lại.', 'success');
         await refreshMembers();
       } catch (error) {
         showToast('Không thể thu hồi thành viên.', error instanceof Error ? error.message : 'Vui lòng thử lại sau.', 'error');
@@ -683,10 +683,10 @@ export default function ProjectDetailPage() {
         nextDeadline,
         nextStatus: editingTask.status,
       })
-      : { hasAssigneeChange: true, hasDeadlineChange: true, hasStatusChange: true, changedLabels: ['người phụ trách', 'deadline', 'trạng thái'] };
+      : { hasAssigneeChange: true, hasDeadlineChange: true, hasStatusChange: true, changedLabels: ['người phụ trách', 'hạn hoàn thành', 'trạng thái'] };
 
     if (currentTask && !hasTaskEditChanges(editIntent)) {
-      showToast('Chưa có thay đổi.', 'Hãy chỉnh người phụ trách, deadline hoặc trạng thái trước khi lưu.', 'info');
+      showToast('Chưa có thay đổi.', 'Hãy chỉnh người phụ trách, hạn hoàn thành hoặc trạng thái trước khi lưu.', 'info');
       return;
     }
 
@@ -712,12 +712,12 @@ export default function ProjectDetailPage() {
           body: JSON.stringify({ deadline: nextDeadline }),
         });
         const updatePayload = await updateResponse.json().catch(() => null) as { message?: string } | null;
-        if (!updateResponse.ok) throw new Error(updatePayload?.message || 'Không thể cập nhật deadline.');
+        if (!updateResponse.ok) throw new Error(updatePayload?.message || 'Không thể cập nhật hạn hoàn thành.');
       }
 
       if (editIntent.hasStatusChange) {
         if (currentTask && !canTransitionTaskStatus(currentTask.status, editingTask.status)) {
-          throw new Error('Chuyển trạng thái này chưa được hỗ trợ bởi state machine.');
+          throw new Error('Chuyển trạng thái này chưa được hỗ trợ bởi luồng kiểm soát.');
         }
 
         const statusResponse = await fetch(`/api/admin/projects/${projectId}/tasks/${editingTask.taskId}/status`, {
@@ -907,7 +907,7 @@ export default function ProjectDetailPage() {
 
         {isProjectCancelled && (
           <section className="rounded-lg border border-red-900 bg-red-950/25 p-4 text-xs text-red-100">
-            Dự án đã hủy. Màn hình này chỉ cho xem dữ liệu hiện có; các thao tác sửa phase, task và thông tin dự án đang bị khóa.
+            Dự án đã hủy. Màn hình này chỉ cho xem dữ liệu hiện có; các thao tác sửa giai đoạn, công việc và thông tin dự án đang bị khóa.
           </section>
         )}
 
@@ -922,7 +922,7 @@ export default function ProjectDetailPage() {
             <section className="rounded-lg border border-slate-800 bg-slate-900">
               <div className="border-b border-slate-800 px-4 py-3">
                 <h2 className="text-sm font-black text-slate-100">Stepper giai đoạn</h2>
-                <p className="text-[11px] text-slate-500">Trạng thái đang derive read-only từ thứ tự phase và trạng thái hoàn thành hiện có.</p>
+                <p className="text-[11px] text-slate-500">Trạng thái chỉ xem đang được tính từ thứ tự giai đoạn và dữ liệu hoàn thành hiện có.</p>
               </div>
               <div className="overflow-x-auto p-4 [scroll-snap-type:x_mandatory]">
                 <div className="flex min-w-max items-start">
@@ -982,7 +982,7 @@ export default function ProjectDetailPage() {
                     <Users className="h-4 w-4 text-cyan-300" />
                     <h2 className="text-sm font-black text-slate-100">Thành viên dự án</h2>
                   </div>
-                  <p className="text-[11px] text-slate-500">{memberCount} thành viên đang hoạt động · Không hard delete membership.</p>
+                  <p className="text-[11px] text-slate-500">{memberCount} thành viên đang hoạt động · Không xóa hẳn hồ sơ thành viên.</p>
                 </div>
                 <button type="button" disabled={!canManageMembers || memberActionLoading} onClick={openAddMemberModal} className="inline-flex items-center gap-2 rounded-lg bg-cyan-600 px-3 py-2 text-xs font-bold text-white hover:bg-cyan-500 disabled:cursor-not-allowed disabled:bg-slate-800 disabled:text-slate-500">
                   <UserPlus className="h-4 w-4" /> Thêm thành viên
@@ -1066,7 +1066,7 @@ export default function ProjectDetailPage() {
                         <button
                           type="button"
                           disabled
-                          title="Server chưa có mutation mở khóa phase."
+                          title="Máy chủ chưa bật thao tác mở khóa giai đoạn."
                           className="inline-flex cursor-not-allowed items-center gap-1 rounded-lg border border-slate-700 px-2 py-1 text-[11px] font-bold text-slate-500"
                         >
                           <Lock className="h-3.5 w-3.5" /> Mở khóa giai đoạn
@@ -1106,10 +1106,10 @@ export default function ProjectDetailPage() {
 
                   <dl className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-2 xl:grid-cols-4">
                     <ProjectDetailField label="Hạn hoàn thành" value={formatDate(selectedPhase.description.stage_deadline || selectedPhase.description.project_deadline)} />
-                    <ProjectDetailField label="Người phụ trách phase" value={selectedPhase.description.stage_owner || 'Chưa gán'} />
-                    <ProjectDetailField label="Tiến độ phase" value={`${selectedPhase.progressPercent}%`} />
+                    <ProjectDetailField label="Người phụ trách giai đoạn" value={selectedPhase.description.stage_owner || 'Chưa gán'} />
+                    <ProjectDetailField label="Tiến độ giai đoạn" value={`${selectedPhase.progressPercent}%`} />
                     <ProjectDetailField label="Số công việc" value={`${selectedPhase.taskCount} tổng · ${selectedPhase.completedTaskCount} xong · ${selectedPhase.overdueTaskCount} quá hạn`} />
-                    <ProjectDetailField label="Trạng thái phase" value={phaseStatusLabel(selectedPhase.status)} />
+                    <ProjectDetailField label="Trạng thái giai đoạn" value={phaseStatusLabel(selectedPhase.status)} />
                     <ProjectDetailField label="Hoạt động gần nhất" value={formatDateTime(selectedPhase.lastActivityAt)} />
                   </dl>
 

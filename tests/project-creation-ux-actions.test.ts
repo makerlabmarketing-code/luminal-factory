@@ -106,7 +106,7 @@ describe('project creation UX, detail actions, and request cleanup', () => {
     expect(detailPage).toMatch(/cổng dữ liệu trạng thái và phụ thuộc/);
     expect(detailPage).toMatch(/hộp thoại/);
     expect(detailPage).toMatch(/Người phụ trách phải là thành viên đang hoạt động/);
-    expect(detailPage).not.toMatch(/Task Assignment Foundation|Task legacy|Sequential workflow|membership ACTIVE|thành viên ACTIVE|cổng migration/);
+    expect(detailPage).not.toMatch(/Task Assignment Foundation|Task legacy|Sequential workflow|membership ACTIVE|thành viên ACTIVE|cổng migration|read-only|derive read-only|hard delete membership|Server chưa có mutation|state machine/);
   });
 
   it('links project names from the task list to the detail page', () => {

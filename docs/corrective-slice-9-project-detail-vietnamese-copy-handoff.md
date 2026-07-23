@@ -30,3 +30,11 @@ Required repository validation was run for this slice:
 ## Next Step
 
 Continue the next safe Phase 4 Project Detail UI/accessibility polish slice, or return to Phase 3 persistence only after explicit live approval.
+
+---
+
+## Continuation on 2026-07-23
+
+Continued the safe Phase 4 Project Detail Vietnamese-copy polish from latest available main evidence. This continuation only replaced remaining user-visible implementation wording in Project Detail: deadline copy became hạn hoàn thành, read-only/derive phase guidance became plain Vietnamese, membership ACTIVE/hard-delete language became hoạt động/xóa hẳn hồ sơ thành viên, and server mutation/state-machine messages became máy chủ/luồng kiểm soát wording.
+
+No service, DTO, repository, mutation authority, role matrix, API contract, business rule, schema, RPC, RLS, backfill, migration execution, deployment, production SQL, or live data changed. Rollback is the Project Detail page/test/documentation diff for this UI-copy-only continuation.

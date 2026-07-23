@@ -27,7 +27,7 @@ describe('task detail subtask binding', () => {
     expect(repository).toMatch(/const estimationDate = pickFirstText\(row, \['estimation_date'\]\) \|\| null/);
     expect(detailPage).toMatch(/function getTaskDeadlineLabel\(task: DisplayTask\): string/);
     expect(detailPage).toMatch(/formatDate\(task\.estimationDate \|\| task\.deadline\)/);
-    expect(detailPage).toMatch(/if \(Number\.isNaN\(date\.getTime\(\)\)\) return 'Chưa đặt deadline'/);
+    expect(detailPage).toMatch(/if \(Number\.isNaN\(date\.getTime\(\)\)\) return 'Chưa đặt hạn hoàn thành'/);
     expect(detailPage).not.toMatch(/Invalid Date/);
   });
 
