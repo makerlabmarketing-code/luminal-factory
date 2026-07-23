@@ -10,6 +10,8 @@ export interface AdminFacilityDto {
   lat: number | string | null;
   lng: number | string | null;
   radius: number | string | null;
+  code: string | null;
+  isActive: boolean | null;
 }
 
 type FacilityRow = {
@@ -19,6 +21,8 @@ type FacilityRow = {
   lat?: number | string | null;
   lng?: number | string | null;
   radius?: number | string | null;
+  code?: string | null;
+  is_active?: boolean | null;
 };
 
 type FacilityPayload = {
@@ -29,7 +33,16 @@ type FacilityPayload = {
   radius: number;
 };
 
-const FACILITY_SELECT = 'id, facility_name, address, lat, lng, radius';
+const BASE_FACILITY_SELECT = 'id, facility_name, address, lat, lng, radius';
+const ACTIVE_FACILITY_SELECT = `${BASE_FACILITY_SELECT}, code, is_active`;
+
+function isFacilityActiveStateEnabled() {
+  return process.env.FACILITY_ACTIVE_STATE_ENABLED === 'true';
+}
+
+function getFacilitySelect() {
+  return isFacilityActiveStateEnabled() ? ACTIVE_FACILITY_SELECT : BASE_FACILITY_SELECT;
+}
 
 async function requireFacilityView() {
   const authContext = await requireWorkspaceAccess('ADMIN_WORKSPACE');
@@ -73,6 +86,8 @@ function toFacilityDto(row: FacilityRow): AdminFacilityDto {
     lat: row.lat ?? null,
     lng: row.lng ?? null,
     radius: row.radius ?? null,
+    code: row.code || null,
+    isActive: row.is_active ?? null,
   };
 }
 
@@ -153,7 +168,7 @@ export async function listAdminFacilities() {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('facilities')
-    .select(FACILITY_SELECT)
+    .select(getFacilitySelect())
     .order('id', { ascending: true });
 
   if (error) {
@@ -165,7 +180,7 @@ export async function listAdminFacilities() {
     });
   }
 
-  return { success: true, facilities: ((data || []) as FacilityRow[]).map(toFacilityDto) };
+  return { success: true, facilities: ((data || []) as unknown as FacilityRow[]).map(toFacilityDto) };
 }
 
 export async function createAdminFacility(body: Record<string, unknown>) {
@@ -175,7 +190,7 @@ export async function createAdminFacility(body: Record<string, unknown>) {
   const { data, error } = await supabase
     .from('facilities')
     .insert(payload)
-    .select(FACILITY_SELECT)
+    .select(getFacilitySelect())
     .single();
 
   if (error) {
@@ -187,7 +202,7 @@ export async function createAdminFacility(body: Record<string, unknown>) {
     });
   }
 
-  return { success: true, facility: toFacilityDto(data as FacilityRow) };
+  return { success: true, facility: toFacilityDto(data as unknown as FacilityRow) };
 }
 
 export async function updateAdminFacility(body: Record<string, unknown>) {
@@ -199,7 +214,7 @@ export async function updateAdminFacility(body: Record<string, unknown>) {
     .from('facilities')
     .update(payload)
     .eq('id', facilityId)
-    .select(FACILITY_SELECT)
+    .select(getFacilitySelect())
     .single();
 
   if (error) {
@@ -211,7 +226,7 @@ export async function updateAdminFacility(body: Record<string, unknown>) {
     });
   }
 
-  return { success: true, facility: toFacilityDto(data as FacilityRow) };
+  return { success: true, facility: toFacilityDto(data as unknown as FacilityRow) };
 }
 
 export async function deleteAdminFacility(body: Record<string, unknown>) {

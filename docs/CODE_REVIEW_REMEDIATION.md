@@ -268,3 +268,13 @@ No SQL, migration execution, migration promotion, schema mutation, RLS mutation,
 | Do not redesign application logic or introduce additional schema changes. | ACTIONABLE | Operator explicitly prohibited redesign and unrelated schema changes. | No application code, unrelated tables, RLS, grants, permissions, Auth, backfill, or inactive-facility filtering were changed. |
 
 No direct SQL, database TCP retry, `supabase db push`, live backfill, RLS mutation, permission mutation, Auth mutation, deployment, destructive operation, production data mutation, unrelated schema change, or next roadmap slice work was performed. Production execution remains delegated to the configured Supabase GitHub Integration after protected-main merge, followed by the reviewed read-only validation SQL.
+
+## 2026-07-23 Facility active-state application gate preparation
+
+Prepared the safe application-only side of facility active-state filtering without requiring the new production columns to exist yet:
+
+- Staff Attendance keeps the legacy `id, facility_name, lat, lng, radius` select by default.
+- After the Supabase GitHub Integration delivers `facilities.is_active` and post-deployment validation passes, operators may set server-only `FACILITY_ACTIVE_STATE_ENABLED=true` to make Staff Attendance select `is_active` and filter only active facilities.
+- Admin facility listing also keeps the legacy select by default, and only includes `code`/`is_active` in the DTO when the same server-side gate is enabled.
+
+No SQL, direct PostgreSQL TCP retry, RLS mutation, schema mutation, facility data mutation, backfill, production deployment, destructive operation, or live data mutation was performed. `LIVE_APPROVAL_REQUIRED` remains for production migration execution/rollback, post-deployment validation, and any live environment variable rollout.
