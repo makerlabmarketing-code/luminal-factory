@@ -1083,12 +1083,19 @@ export default function ProjectDetailPage() {
                   )}
 
                   {editingPhaseId === selectedPhase.item.phase_id && (
-                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_110px_auto]">
-                      <input value={editingPhaseName} onChange={(event) => setEditingPhaseName(event.target.value)} className="rounded border border-slate-800 bg-slate-950 px-3 py-2 text-xs outline-none" />
-                      <input type="number" min={0} value={editingPhaseOrder} onChange={(event) => setEditingPhaseOrder(event.target.value)} className="rounded border border-slate-800 bg-slate-950 px-3 py-2 text-xs outline-none" />
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_110px_auto]" aria-labelledby="edit-phase-title">
+                      <p id="edit-phase-title" className="sr-only">Sửa thông tin giai đoạn đang chọn</p>
+                      <div>
+                        <label htmlFor="edit-phase-name" className="sr-only">Tên giai đoạn</label>
+                        <input id="edit-phase-name" value={editingPhaseName} onChange={(event) => setEditingPhaseName(event.target.value)} className="w-full rounded border border-slate-800 bg-slate-950 px-3 py-2 text-xs outline-none" />
+                      </div>
+                      <div>
+                        <label htmlFor="edit-phase-order" className="sr-only">Thứ tự giai đoạn</label>
+                        <input id="edit-phase-order" type="number" min={0} value={editingPhaseOrder} onChange={(event) => setEditingPhaseOrder(event.target.value)} className="w-full rounded border border-slate-800 bg-slate-950 px-3 py-2 text-xs outline-none" />
+                      </div>
                       <div className="flex gap-2">
-                        <button onClick={() => handleSavePhase(selectedPhase)} className="rounded bg-emerald-600 px-3 py-2 text-xs font-bold text-white">Lưu</button>
-                        <button onClick={() => setEditingPhaseId(null)} className="rounded border border-slate-700 px-3 py-2 text-xs font-bold text-slate-300">Hủy</button>
+                        <button type="button" onClick={() => handleSavePhase(selectedPhase)} className="rounded bg-emerald-600 px-3 py-2 text-xs font-bold text-white">Lưu</button>
+                        <button type="button" onClick={() => setEditingPhaseId(null)} className="rounded border border-slate-700 px-3 py-2 text-xs font-bold text-slate-300">Hủy</button>
                       </div>
                     </div>
                   )}

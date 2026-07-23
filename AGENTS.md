@@ -159,6 +159,67 @@ Update roadmap status after every completed phase.
 
 ---
 
+
+## Autonomous Roadmap Execution
+
+Future roadmap sessions should advance through the roadmap without requiring additional orchestration prompts.
+
+When continuing a previous roadmap session, automatically determine:
+
+- latest completed slice
+- latest merged state
+- latest roadmap position
+- latest remediation status
+
+Continue from that point and never restart previous slices unless new evidence creates an unresolved blocker.
+
+Continue roadmap slices automatically. Do not stop after every slice. Stop only when reaching:
+
+- `LIVE_APPROVAL_REQUIRED` and no safe preparatory work remains
+- destructive migration
+- production deployment
+- schema mutation requiring approval
+- explicit user instruction
+- unresolved blocker
+
+Otherwise continue to the next roadmap task.
+
+Expected autonomous execution loop:
+
+```
+Implement
+      ↓
+Test
+      ↓
+Review
+      ↓
+Remediate
+      ↓
+Update Docs
+      ↓
+Prepare Migration Package (if needed)
+      ↓
+LIVE_APPROVAL (if needed)
+      ↓
+Continue Next Slice
+```
+
+When `LIVE_APPROVAL_REQUIRED` is reached, continue every safe task before stopping, including:
+
+- documentation
+- tests
+- application wiring
+- review remediation
+- roadmap update
+- handoff
+- validation SQL
+- rollback SQL
+- compatibility analysis
+
+Stop only when no safe work remains before the approval gate.
+
+---
+
 ## Auto Roadmap Execution
 
 Unless blocked by an approval gate, continue the roadmap automatically.
@@ -229,13 +290,16 @@ Allowed before migration:
 - roadmap updates
 - handoff documents
 
-Then prepare:
+Then prepare the complete migration package before requesting live approval:
 
-- migration
+- forward migration
 - rollback
 - validation SQL
+- compatibility report
 - backfill plan
 - RLS plan
+- handoff
+- roadmap update
 
 Then stop at:
 
@@ -334,15 +398,21 @@ Codex Cloud must not require direct PostgreSQL TCP connectivity for repository p
 
 When the Supabase Session Pooler host, port, username, project reference, and IPv4 resolution have been confirmed but outbound PostgreSQL TCP attempts fail with `Network is unreachable`, record `DATABASE_TCP_UNAVAILABLE`. This is an execution-environment limitation, not a Supabase credential failure, IPv6 configuration failure, repository defect, or malformed Session Pooler URL.
 
-After `DATABASE_TCP_UNAVAILABLE` is confirmed:
+If Codex Cloud cannot reach PostgreSQL because database TCP is unavailable, the network is unreachable, IPv6 resolution fails, a firewall blocks access, or the cloud sandbox restricts outbound database connections:
 
 - do not repeatedly retry `psql`, `supabase db push`, `supabase db query`, or pooler probes from Codex Cloud;
-- do not classify the condition as a repository blocker for application-only work;
-- document the limitation in the handoff while preserving schema, RLS, rollback, validation, and live-approval requirements;
+- prepare the migration package;
+- prepare the validation package;
+- prepare the rollback package;
+- update the roadmap;
+- update the handoff;
+- update remediation records;
+- stop before deployment or live mutation;
+- never classify this as a repository failure;
 - never expose access tokens, database passwords, connection strings, or `.pgpass` contents;
 - keep `SUPABASE_ACCESS_TOKEN` and `SUPABASE_DB_PASSWORD` as setup-only secrets, not ordinary environment variables.
 
-For reviewed migrations, prefer the configured Supabase GitHub Integration: place only approved forward migrations under `supabase/migrations/`, keep rollback and validation artifacts separately, create or update the pull request, and let the protected main-branch merge workflow trigger Supabase production migration delivery. Do not place draft or unapproved SQL under `supabase/migrations/`. Production database changes still require every approval gate and must not be executed directly from Codex Cloud.
+When the Supabase GitHub Integration is configured, treat it as the canonical production migration delivery workflow. Place only approved forward migrations under `supabase/migrations/`, keep rollback and validation artifacts separately, create or update the pull request, and let the protected main-branch merge workflow trigger Supabase production migration delivery. Never attempt production migration directly from Codex Cloud when database connectivity is unavailable. Do not place draft or unapproved SQL under `supabase/migrations/`. Production database changes still require every approval gate.
 
 ---
 ## Supabase Management API Fallback
@@ -403,14 +473,16 @@ After the pull request is merged, future roadmap work must continue from the lat
 
 Before starting any new roadmap slice:
 
-1. Inspect unresolved review findings for the current open PR.
+1. Inspect only newly opened review comments, newly actionable findings, and unresolved findings for the current open PR.
 2. Compare new findings against docs/CODE_REVIEW_REMEDIATION.md.
-3. Skip findings already classified as:
+3. Do not re-review completed slices.
+4. Skip findings already classified as:
    - ALREADY_FIXED_AND_VERIFIED
    - FALSE_POSITIVE_WITH_EVIDENCE
    - NOT_APPLICABLE_WITH_EVIDENCE
-4. Remediate ACTIONABLE findings before implementing unrelated roadmap work.
-5. Update CODE_REVIEW_REMEDIATION.md after every remediation PR.
+5. Keep previously fixed findings closed unless new evidence appears.
+6. Remediate ACTIONABLE findings before implementing unrelated roadmap work.
+7. Update CODE_REVIEW_REMEDIATION.md after every remediation PR.
 
 ### Code Review Source and Remediation Policy
 
@@ -450,10 +522,11 @@ Delivery is complete only when:
 
 If the active task cannot access Code Review findings:
 
-- report REVIEW_SOURCE_UNAVAILABLE
+- record `REVIEW_SOURCE_UNAVAILABLE`
+- continue implementation and roadmap execution with available review sources
 - do not guess missing findings
 - do not block unrelated work solely because old merged-PR findings are unavailable
-- instruct the operator to run remediation from the Code Review workflow or provide the findings explicitly
+- instruct the operator to run remediation from the Code Review workflow or provide the findings explicitly when review remediation itself is the active task
 
 Auto-merge must not proceed while actionable Code Review findings remain.
 
