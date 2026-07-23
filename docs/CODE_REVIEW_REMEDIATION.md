@@ -228,3 +228,9 @@ Self-review classification: no newly actionable P0/P1 findings were identified i
 Self-review classification: no newly actionable P0/P1 findings were identified in this application-only Project Detail Vietnamese-copy polish. The slice only rewords user-visible technical guidance in Project Detail and preserves existing phase, membership, task, permission, schema/RPC/RLS, and live approval gates.
 
 No SQL, migration execution, RLS mutation, schema mutation, workspace grant, employee permission assignment, backfill, deployment, destructive operation, production data mutation, inventory quantity mutation, or service-role exposure was performed.
+
+## 2026-07-23 Project Detail Vietnamese Copy Continuation
+
+`REVIEW_SOURCE_UNAVAILABLE`: connected Codex GitHub Code Review findings and unresolved PR conversations are not exposed in this environment. This continuation inspected the current checkout, roadmap, remediation ledger, Project Detail implementation, and existing Vietnamese-copy handoff as available review evidence. No newly actionable P0/P1 finding was available from those sources.
+
+Self-review classification: no business-rule, permission, schema, RLS, RPC, deployment, or live-data finding was introduced. The only actionable local finding was remaining user-visible implementation wording in Project Detail; it was remediated by replacing read-only/derive, deadline, membership ACTIVE/hard-delete, server mutation, and state-machine copy with plain Vietnamese and adding static regression coverage.
